@@ -20,7 +20,7 @@ def process_image(image_path):
     return image, norm_image
 
 
-image_path = 'img/test.png'
+image_path = 'img/test3.png'
 
 _, processed_image = process_image(image_path)
 

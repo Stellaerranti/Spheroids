@@ -2,27 +2,44 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class Cell:
-    def __init__(self, x, radius=1, filtration_rate=0.01):
+    def __init__(self, x, radius=1, filtration_rate=0.1, saturation_boundary=0.9, decay_rate=0.1, consumption = 0.02):
         self.x = x
         self.radius = radius
-        self.filtration_rate = filtration_rate  # Defines how much substance is filtered
+        self.filtration_rate = filtration_rate
+        self.saturation = 1
+        self.saturation_coeff = filtration_rate
+        self.saturation_boundary = saturation_boundary
+        self.decay_rate = decay_rate
+        self.alive = True
+        self.consumption = consumption
     
     def draw(self, ax):
-        circle = plt.Circle((self.x, 0), self.radius, color='blue', alpha=0.6, edgecolor='black')
+        color = 'blue' if self.alive else 'red'
+        circle = plt.Circle((self.x, 0), self.radius, color=color, alpha=0.6, edgecolor='black')
         ax.add_patch(circle)
     
+    def live(self):
+        if not self.alive:
+            return
+        self.saturation = self.saturation - self.consumption
+        
+        if self.saturation < self.saturation_boundary:
+            self.radius *= (1 - self.decay_rate)
+        if self.radius < 0.9:
+            self.alive = False
+
 class Spheroid:
     def __init__(self, num_cells, cell_radius, diffusion_coefficient, dx, dt):
         self.num_cells = num_cells
         self.cell_radius = cell_radius
         self.diffusion_coefficient = diffusion_coefficient
-        self.dx = dx  # Spatial step
-        self.dt = dt  # Time step
+        self.dx = dx
+        self.dt = dt
         self.length = num_cells * cell_radius * 2
         self.grid_size = int(self.length / dx) + 1
-        self.concentration = np.ones(self.grid_size)  # Initially filled with substance
+        self.concentration = np.ones(self.grid_size)
         self.generate_cells()
-        
+    
     def generate_cells(self):
         self.cells = []
         spacing = 2 * self.cell_radius
@@ -30,37 +47,63 @@ class Spheroid:
         for i in range(self.num_cells):
             self.cells.append(Cell(start_pos + i * spacing, self.cell_radius))
     
-    def diffuse_and_filter(self, iterations):
+    def diffuse_and_filter(self):
         alpha = self.diffusion_coefficient * self.dt / (self.dx ** 2)
-        for _ in range(iterations):
-            new_concentration = self.concentration.copy()
-            for i in range(1, self.grid_size - 1):
-                new_concentration[i] = (
-                    self.concentration[i] + alpha * (self.concentration[i + 1] - 2 * self.concentration[i] + self.concentration[i - 1])
-                )
-            # Apply filtering effect across cell radius
-            for cell in self.cells:
-                center_idx = int((cell.x + self.length / 2) / self.dx)
-                radius_range = int(cell.radius / self.dx)
-                for j in range(-radius_range, radius_range + 1):
-                    idx = center_idx + j
-                    if 0 <= idx < self.grid_size:
-                        distance_factor = 1 - (j / radius_range) ** 2  # Parabolic filtration function
-                        new_concentration[idx] *= (1 - cell.filtration_rate * distance_factor)
-            self.concentration = new_concentration
+        
+        new_concentration = self.concentration.copy()
+        for i in range(1, self.grid_size - 1):
+            new_concentration[i] = (
+                self.concentration[i] + alpha * (self.concentration[i + 1] - 2 * self.concentration[i] + self.concentration[i - 1])
+            )
+        for cell in self.cells:
+            if not cell.alive:
+                break
+            center_idx = int((cell.x + self.length / 2) / self.dx)
+            radius_range = int(cell.radius / self.dx)
+            consumed_amount = 0
+            for j in range(-radius_range, radius_range + 1):
+                idx = center_idx + j
+                if 0 <= idx < self.grid_size:
+                    distance_factor = 1 - (j / radius_range) ** 2  # Parabolic filtration function
+                    filtered = new_concentration[idx] * cell.filtration_rate * distance_factor
+                    consumed_amount += filtered
+                    new_concentration[idx] *= (1 - cell.filtration_rate * distance_factor)
+                 
+            cell.saturation = min(1, cell.saturation + consumed_amount * cell.saturation_coeff)        
+            cell.live()            
+        self.concentration = new_concentration        
+    
+    def update_system(self, iterations):        
+        for _ in range(iterations):      
+            self.diffuse_and_filter()
+        
     
     def plot_concentration(self):
         x_positions = np.linspace(-self.length / 2, self.length / 2, self.grid_size)
         plt.figure(figsize=(8, 4))
         plt.plot(x_positions, self.concentration, label='Concentration Profile')
-        plt.ylim(0,1.1)
+        plt.ylim(0, 1.1)
         plt.xlabel('Position')
         plt.ylabel('Concentration')
         plt.title('Diffusion with Parabolic Filtration')
         plt.legend()
         plt.show()
     
+    def plot_cells(self):
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.set_xlim(-self.length / 2, self.length / 2)
+        ax.set_ylim(-2, 2)
+        ax.set_aspect('equal')
+        ax.set_title("Spheroid Cell Distribution")
+        for cell in self.cells:
+            cell.draw(ax)
+        plt.show()
+    
 # Example Usage:
+plt.close('all')    
+    
 spheroid = Spheroid(num_cells=5, cell_radius=1, diffusion_coefficient=0.1, dx=0.1, dt=0.01)
-spheroid.diffuse_and_filter(iterations=300)
+spheroid.update_system(iterations=100)
+
 spheroid.plot_concentration()
+spheroid.plot_cells()
