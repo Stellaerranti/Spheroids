@@ -1,8 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import random
 
 class Cell:
-    def __init__(self, x, radius=1, filtration_rate=0.1, saturation_boundary=0.9, decay_rate=0.1, consumption = 0.02):
+    def __init__(self, x, radius=1, filtration_rate=0.1, saturation_boundary=0.9, decay_rate=0.1, death_boundary=0.7, consumption=0.02,
+                 division_chance=0.3, division_boundary=0.8):
         self.x = x
         self.radius = radius
         self.filtration_rate = filtration_rate
@@ -12,21 +14,47 @@ class Cell:
         self.decay_rate = decay_rate
         self.alive = True
         self.consumption = consumption
+        self.division_chance = division_chance
+        self.death_boundary = death_boundary
+        self.division_boundary = division_boundary
     
     def draw(self, ax):
         color = 'blue' if self.alive else 'red'
         circle = plt.Circle((self.x, 0), self.radius, color=color, alpha=0.6, edgecolor='black')
         ax.add_patch(circle)
+        
+    def divide(self, spheroid):
+        if random.random() < self.division_chance:
+            direction = random.choice([-1, 1])  # -1 for left, 1 for right
+            new_x = self.x + direction * (spheroid.cell_radius * 2 )  # Ensure separation
+            
+            spheroid.push_cells(self.x, new_x, direction)
+            
+            new_cell = Cell(new_x, self.radius, self.filtration_rate, self.saturation_boundary,
+                            self.decay_rate, self.death_boundary, self.consumption, self.division_chance, self.division_boundary)
+            spheroid.cells.append(new_cell)
+            spheroid.num_cells += 1
+            spheroid.length = spheroid.num_cells * spheroid.cell_radius * 2            
+            spheroid.compact()
     
-    def live(self):
+    def live(self, spheroid):
         if not self.alive:
             return
-        self.saturation = self.saturation - self.consumption
+        self.saturation -= self.consumption
         
         if self.saturation < self.saturation_boundary:
             self.radius *= (1 - self.decay_rate)
-        if self.radius < 0.9:
+        
+        if(self.saturation > self.saturation_boundary and self.radius < spheroid.cell_radius):
+            self.radius*= (1 + self.decay_rate)
+        
+        if self.radius < self.death_boundary:
             self.alive = False
+            return
+        
+        if self.saturation > self.division_boundary:
+            self.divide(spheroid)
+            
 
 class Spheroid:
     def __init__(self, num_cells, cell_radius, diffusion_coefficient, dx, dt):
@@ -47,9 +75,31 @@ class Spheroid:
         for i in range(self.num_cells):
             self.cells.append(Cell(start_pos + i * spacing, self.cell_radius))
     
+    def push_cells(self, parent_x, new_x, direction):
+
+        if (parent_x < 0):            
+            for cell in self.cells:
+                if cell.x <= new_x:
+                    cell.x -= 2*self.cell_radius            
+                                    
+        if (parent_x > 0):            
+            for cell in self.cells:
+                if cell.x >= new_x:
+                    cell.x += 2*self.cell_radius 
+        
+        if (parent_x == 0):
+            if (direction == 1):
+                for cell in self.cells:
+                    if cell.x > 0:
+                        cell.x += 2*self.cell_radius 
+            if (direction == -1):
+               for cell in self.cells:
+                   if cell.x < 0:
+                       cell.x -= 2*self.cell_radius 
+            
+    
     def diffuse_and_filter(self):
         alpha = self.diffusion_coefficient * self.dt / (self.dx ** 2)
-        
         new_concentration = self.concentration.copy()
         for i in range(1, self.grid_size - 1):
             new_concentration[i] = (
@@ -70,37 +120,35 @@ class Spheroid:
                     new_concentration[idx] *= (1 - cell.filtration_rate * distance_factor)
                  
             cell.saturation = min(1, cell.saturation + consumed_amount * cell.saturation_coeff)        
-            cell.live()            
+            cell.live(self)            
         self.concentration = new_concentration        
     
     def update_system(self, iterations):        
         for _ in range(iterations):      
             self.diffuse_and_filter()
-            self.compact()
-        
+            self.compact()        
     
     def compact(self):
         reference_cell = min(self.cells, key=lambda cell: abs(cell.x))
         reference_x = reference_cell.x  # Keep reference cell in place
         
-        # Sort cells into negative and positive sides
-        negative_side = [cell for cell in self.cells if cell.x < reference_x]
-        positive_side = [cell for cell in self.cells if cell.x > reference_x]
+        # Separate cells into positive and negative sides, sorting them by distance from reference
+        negative_side = sorted([cell for cell in self.cells if cell.x < reference_x], key=lambda cell: -cell.x)
+        positive_side = sorted([cell for cell in self.cells if cell.x > reference_x], key=lambda cell: cell.x)
         
         # Move positive side towards reference cell
         for i in range(len(positive_side)):
             prev_cell = positive_side[i - 1] if i > 0 else reference_cell
-            expected_x = prev_cell.x + prev_cell.radius + positive_side[i].radius
+            expected_x = prev_cell.x + prev_cell.radius + positive_side[i].radius + self.dx
             if positive_side[i].x > expected_x:
                 positive_side[i].x = expected_x
         
         # Move negative side towards reference cell
-        for i in range(len(negative_side) - 1, -1, -1):
-            next_cell = negative_side[i + 1] if i < len(negative_side) - 1 else reference_cell
-            expected_x = next_cell.x - next_cell.radius - negative_side[i].radius
+        for i in range(len(negative_side)):
+            prev_cell = negative_side[i - 1] if i > 0 else reference_cell
+            expected_x = prev_cell.x - prev_cell.radius - negative_side[i].radius - self.dx
             if negative_side[i].x < expected_x:
-                negative_side[i].x = expected_x
-        
+                negative_side[i].x = expected_x 
     
     def plot_concentration(self):
         x_positions = np.linspace(-self.length / 2, self.length / 2, self.grid_size)
@@ -115,7 +163,8 @@ class Spheroid:
     
     def plot_cells(self):
         fig, ax = plt.subplots(figsize=(8, 4))
-        ax.set_xlim(-self.length / 2, self.length / 2)
+        #ax.set_xlim(-self.length / 2, self.length / 2)
+        ax.set_xlim(-20, 20)
         ax.set_ylim(-2, 2)
         ax.set_aspect('equal')
         ax.set_title("Spheroid Cell Distribution")
@@ -127,7 +176,5 @@ class Spheroid:
 plt.close('all')    
     
 spheroid = Spheroid(num_cells=5, cell_radius=1, diffusion_coefficient=0.1, dx=0.1, dt=0.01)
-spheroid.update_system(iterations=100)
-
-spheroid.plot_concentration()
+spheroid.update_system(iterations=1)
 spheroid.plot_cells()
