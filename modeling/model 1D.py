@@ -76,6 +76,30 @@ class Spheroid:
     def update_system(self, iterations):        
         for _ in range(iterations):      
             self.diffuse_and_filter()
+            self.compact()
+        
+    
+    def compact(self):
+        reference_cell = min(self.cells, key=lambda cell: abs(cell.x))
+        reference_x = reference_cell.x  # Keep reference cell in place
+        
+        # Sort cells into negative and positive sides
+        negative_side = [cell for cell in self.cells if cell.x < reference_x]
+        positive_side = [cell for cell in self.cells if cell.x > reference_x]
+        
+        # Move positive side towards reference cell
+        for i in range(len(positive_side)):
+            prev_cell = positive_side[i - 1] if i > 0 else reference_cell
+            expected_x = prev_cell.x + prev_cell.radius + positive_side[i].radius
+            if positive_side[i].x > expected_x:
+                positive_side[i].x = expected_x
+        
+        # Move negative side towards reference cell
+        for i in range(len(negative_side) - 1, -1, -1):
+            next_cell = negative_side[i + 1] if i < len(negative_side) - 1 else reference_cell
+            expected_x = next_cell.x - next_cell.radius - negative_side[i].radius
+            if negative_side[i].x < expected_x:
+                negative_side[i].x = expected_x
         
     
     def plot_concentration(self):
