@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import random
 
 class Cell:
-    def __init__(self, x, radius=1, filtration_rate=0.1, saturation_boundary=0.9, decay_rate=0.1, death_boundary=0.7, consumption=0.02,
+    def __init__(self, x, radius=1, filtration_rate=0.1, saturation_boundary=0.8, decay_rate=0.1, death_boundary=0.7, consumption=0.08,
                  division_chance=0.3, division_boundary=0.8):
         self.x = x
         self.radius = radius
@@ -163,8 +163,8 @@ class Spheroid:
     
     def plot_cells(self):
         fig, ax = plt.subplots(figsize=(8, 4))
-        #ax.set_xlim(-self.length / 2, self.length / 2)
-        ax.set_xlim(-20, 20)
+        ax.set_xlim(-self.length / 2, self.length / 2)
+        #ax.set_xlim(-20, 20)
         ax.set_ylim(-2, 2)
         ax.set_aspect('equal')
         ax.set_title("Spheroid Cell Distribution")
@@ -176,5 +176,6 @@ class Spheroid:
 plt.close('all')    
     
 spheroid = Spheroid(num_cells=5, cell_radius=1, diffusion_coefficient=0.1, dx=0.1, dt=0.01)
-spheroid.update_system(iterations=1)
+spheroid.update_system(iterations=100)
 spheroid.plot_cells()
+spheroid.plot_concentration()
