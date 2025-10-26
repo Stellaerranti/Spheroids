@@ -27,6 +27,7 @@ alpha = 0.3     # Proliferation rate
 beta = 0.2      # Death rate
 
 '''
+D_H = 0.001 
 D_N    = 0.002     # 🔻 Slower nutrient diffusion
 gamma  = 0.2       # 🔺 Faster nutrient consumption
 alpha  = 0.3       # ⏸️  Keep proliferation the same
@@ -34,7 +35,7 @@ beta   = 0.8
 '''
 # Initial conditions
 N_max = 1.0
-R0 = 0.2             # Initial spheroid radius
+R0 = 0.1             # Initial spheroid radius
 H_init = 1.0         # Initial health level inside spheroid
 
 # ====================== INITIALIZATION ======================
