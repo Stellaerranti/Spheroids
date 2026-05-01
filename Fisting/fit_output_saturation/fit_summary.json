@@ -1,0 +1,48 @@
+{
+  "model": {
+    "equations": [
+      "n_t = laplacian(n) - lambda_ * n/(k_n + n) * h",
+      "h_t = delta * laplacian(h) + alpha * n/(k_p + n) * h * (1-h) - beta * k_d/(k_d + n) * h"
+    ],
+    "boundary_conditions": {
+      "nutrient": "Dirichlet n = 1",
+      "health": "Neumann zero-flux"
+    }
+  },
+  "shared_params": {
+    "lambda_": 0.01472346084780231,
+    "delta": 0.9289032006717172,
+    "k_n": 0.00035373741139841503,
+    "k_p": 0.010751994494722398,
+    "k_d": 0.0004000114266192506,
+    "alpha": 24.093404580021126,
+    "beta": 0.002986115287005578,
+    "s": 3.2706276611494944
+  },
+  "per_dataset_R0": {
+    "500": 145.56450788979302
+  },
+  "loss": "soft_l1",
+  "f_scale": 20.0,
+  "sigma0": 10.0,
+  "H_threshold": 0.8,
+  "use_continuous_proxy": false,
+  "kappa": 1.5,
+  "grid": 48,
+  "domain_half_size": 50.0,
+  "optimizer": {
+    "global_DE": true,
+    "DE_maxiter": 3,
+    "DE_popsize": 4,
+    "LS_max_nfev": 20
+  },
+  "solver": {
+    "CFL_safety": 0.24
+  },
+  "result": {
+    "success": true,
+    "message": "`ftol` termination condition is satisfied.",
+    "cost": 769.1213367610655,
+    "nfev": 3
+  }
+}
