@@ -1,0 +1,39 @@
+{
+  "shared_params": {
+    "D_N": 0.0020610629273290124,
+    "D_H": 8.800346251052262e-05,
+    "gamma": 1.9287549819174201,
+    "alpha": 0.002228721125443478,
+    "beta": 0.0041392861942424804,
+    "s": 5.050635871242243
+  },
+  "per_dataset_R0": {
+    "15625": 219.85545391693654,
+    "2000": 352.66931933180757,
+    "500": 301.1925187297163,
+    "8000": 274.7772832721241
+  },
+  "loss": "soft_l1",
+  "f_scale": 20.0,
+  "sigma0": 10.0,
+  "H_threshold": 0.8,
+  "use_continuous_proxy": false,
+  "kappa": 1.5,
+  "grid": 128,
+  "domain_half_size": 50.0,
+  "optimizer": {
+    "global_DE": true,
+    "DE_maxiter": 40,
+    "DE_popsize": 10,
+    "LS_max_nfev": 200
+  },
+  "solver": {
+    "CFL_safety": 0.24
+  },
+  "result": {
+    "success": true,
+    "message": "`ftol` termination condition is satisfied.",
+    "cost": 1443.0266973585396,
+    "nfev": 2
+  }
+}

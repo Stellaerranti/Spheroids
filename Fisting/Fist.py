@@ -7,8 +7,7 @@
 #   H_t = D_H ∇²H + α N H (1 - H) - β (1 - N) H
 # BC: N = 1 (Dirichlet) at boundary; H Neumann (copy edges)
 # Radius extraction: R_sim(t) from area where H >= c (c = H_THRESH), then R = s * sqrt(A/π)
-#
-# Author: ChatGPT (GPT-5 Thinking) — 2025-10-26
+
 
 import os
 import json
@@ -42,7 +41,7 @@ except Exception:
 # =========================
 # ===== User config =======
 # =========================
-OUT_DIR = "fit_output"        # folder for all outputs
+OUT_DIR = "fit_output_simple"        # folder for all outputs
 DATA_GLOB = "*.txt"           # pattern for data files (your files like 500.txt, 2000.txt, etc.)
 SAVE_FIGS = True
 SAVE_JSON = True
