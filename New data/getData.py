@@ -6,7 +6,7 @@ import os
 # ---- CONFIG ----
 data_folder = r"C:\Users\User\Documents\GitHub\Spheroids\New data"
 
-val_initial_cells = [3375, 1000]
+val_initial_cells = [3375,1000]
 
 
 def parse_path(filepath):
@@ -48,7 +48,55 @@ if len(all_files) == 0:
 
 
 # ---- LOAD FILES ----
+# ---- LOAD FILES ----
 all_data = []
+
+# ImageJ columns you want to use for fitting/comparison
+parameter_columns = [
+    "Area",
+    "Mean",
+    "StdDev",
+    "Mode",
+    "Min",
+    "Max",
+    "X",
+    "Y",
+    "XM",
+    "YM",
+    "Perim.",
+    "Width",
+    "Height",
+    "Major",
+    "Minor",
+    "Angle",
+    "Circ.",
+    "Feret",
+    "IntDen",
+    "Median",
+    "Skew",
+    "Kurt",
+    "RawIntDen",
+    "MinFeret",
+    "AR",
+    "Round",
+    "Solidity",
+]
+
+# Cleaner output names
+name_map = {
+    "Mean": "GrayMean",
+    "StdDev": "GrayStdDev",
+    "Mode": "GrayMode",
+    "Min": "GrayMin",
+    "Max": "GrayMax",
+    "X": "CentroidX",
+    "Y": "CentroidY",
+    "XM": "CenterMassX",
+    "YM": "CenterMassY",
+    "Perim.": "Perimeter",
+    "Circ.": "Circularity",
+    "AR": "AspectRatio",
+}
 
 for f in all_files:
     init, day = parse_path(f)
@@ -58,7 +106,7 @@ for f in all_files:
 
     df = pd.read_csv(f)
 
-    # clean column names
+    # Clean column names
     df.columns = [str(c).strip() for c in df.columns]
 
     print("\nReading:", f)
@@ -68,24 +116,68 @@ for f in all_files:
         print("⚠️ File has no 'Area' column:", f)
         continue
 
-    df["Area"] = pd.to_numeric(df["Area"], errors="coerce")
+    # Keep only columns that exist in this file
+    existing_columns = [c for c in parameter_columns if c in df.columns]
+
+    # Convert all selected columns to numeric
+    for col in existing_columns:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # Area is required because it defines whether a row is valid
     df = df.dropna(subset=["Area"])
 
     if df.empty:
         print("⚠️ No valid numeric Area values:", f)
         continue
 
+    # Derived parameters
     df["Radius"] = np.sqrt(df["Area"] / np.pi)
 
-    all_data.append({
+    if "Major" in df.columns and "Minor" in df.columns:
+        df["EllipseArea"] = np.pi * (df["Major"] / 2) * (df["Minor"] / 2)
+
+    if "Area" in df.columns and "Perim." in df.columns:
+        df["Circularity_calc"] = 4 * np.pi * df["Area"] / (df["Perim."] ** 2)
+
+    if "Area" in df.columns and "Mean" in df.columns:
+        df["IntDen_calc"] = df["Area"] * df["Mean"]
+
+    derived_columns = [
+        "Radius",
+        "EllipseArea",
+        "Circularity_calc",
+        "IntDen_calc",
+    ]
+
+    all_columns = existing_columns + [
+        c for c in derived_columns if c in df.columns
+    ]
+
+    row = {
         "InitialCells": init,
         "Day": day,
-        "MeanArea": df["Area"].mean(),
-        "StdArea": df["Area"].std(),
-        "MeanRadius": df["Radius"].mean(),
-        "StdRadius": df["Radius"].std(),
-        "N": df["Radius"].count()
-    })
+        "N": df["Area"].count(),
+    }
+
+    for col in all_columns:
+        clean_name = name_map.get(col, col)
+        clean_name = (
+            clean_name.replace(".", "")
+                      .replace("%", "Percent")
+                      .replace(" ", "")
+        )
+
+        values = df[col].dropna()
+
+        if values.empty:
+            row[f"Mean{clean_name}"] = np.nan
+            row[f"Std{clean_name}"] = np.nan
+            continue
+
+        row[f"Mean{clean_name}"] = values.mean()
+        row[f"Std{clean_name}"] = values.std(ddof=1)
+
+    all_data.append(row)
 
 
 # ---- AGGREGATE ----
