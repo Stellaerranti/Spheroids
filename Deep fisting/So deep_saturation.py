@@ -25,12 +25,21 @@ def load_empirical_data(path):
 
     required = [
     "Day",
+
     "MeanRadius",
     "StdRadius",
+
     "MeanGrayMean",
     "StdGrayMean",
+
     "MeanIntDen",
     "StdIntDen",
+
+    "MeanFeret",
+    "StdFeret",
+
+    "MeanPerimeter",
+    "StdPerimeter",
     ]
 
     missing = [c for c in required if c not in data.columns]
@@ -40,17 +49,29 @@ def load_empirical_data(path):
     return data
 
 def simulate_model(params, empirical_days, N_grid=80, L=1.0, dt=0.002):
-    D_N, D_H, gamma, alpha, beta, R0, time_scale = params
+    (
+        lambda_,
+        delta,
+        k_n,
+        k_p,
+        k_d,
+        alpha,
+        beta,
+        R0,
+        time_scale,
+    ) = params
 
     x = np.linspace(-L, L, N_grid)
     y = np.linspace(-L, L, N_grid)
     dx = x[1] - x[0]
 
-
     X, Y = np.meshgrid(x, y)
 
-    N = np.ones((N_grid, N_grid))
-    H = np.exp(-(X**2 + Y**2) / (2 * (R0 / 2)**2))
+    n = np.ones((N_grid, N_grid))
+    h = np.exp(-(X**2 + Y**2) / (2 * (R0 / 2)**2))
+    
+    #print("Initial h max:", h.max())
+    #rint("Initial pixels above threshold:", np.sum(h > 0.2))
 
     empirical_days = np.asarray(empirical_days, dtype=float)
     empirical_model_times = empirical_days * time_scale
@@ -69,18 +90,27 @@ def simulate_model(params, empirical_days, N_grid=80, L=1.0, dt=0.002):
         if t_step in output_steps:
             day = output_steps[t_step]
             results[day] = {
-                "H": H.copy(),
-                "N": N.copy(),
+                "H": h.copy(),
+                "N": n.copy(),
                 "dx": dx,
                 "x": x,
                 "y": y,
             }
 
         if t_step < steps:
-            N, H = step(N, H, D_N, D_H, gamma, alpha, beta, dx, dt)
-        
-            N = np.clip(N, 0.0, 1.0)
-            H = np.clip(H, 0.0, 1.0)
+            n, h = step(
+                n,
+                h,
+                lambda_,
+                delta,
+                k_n,
+                k_p,
+                k_d,
+                alpha,
+                beta,
+                dx,
+                dt,
+            )
 
     return results
 
@@ -112,6 +142,12 @@ def calculate_model_observables(H, dx, pixel_scale=1.0, intensity_scale=255.0, t
     """
 
     mask_area = bf.get_spheroid_mask(H, threshold=threshold)
+    touches_boundary = (
+    np.any(mask_area[0, :]) or
+    np.any(mask_area[-1, :]) or
+    np.any(mask_area[:, 0]) or
+    np.any(mask_area[:, -1])
+)
 
     if not np.any(mask_area):
         return {
@@ -122,6 +158,7 @@ def calculate_model_observables(H, dx, pixel_scale=1.0, intensity_scale=255.0, t
             "Circularity": np.nan,
             "Feret": np.nan,
             "Perimeter": np.nan,
+            "TouchesBoundary": False,
         }
 
     # Geometry in model units
@@ -153,52 +190,55 @@ def calculate_model_observables(H, dx, pixel_scale=1.0, intensity_scale=255.0, t
     int_den = area_pixels * gray_mean
 
     return {
-        "Radius": radius_pixels,
-        "Area": area_pixels,
-        "GrayMean": gray_mean,
-        "IntDen": int_den,
-        "Circularity": circularity,
-        "Feret": feret_pixels,
-        "Perimeter": perimeter_pixels,
+    "Radius": radius_pixels,
+    "Area": area_pixels,
+    "GrayMean": gray_mean,
+    "IntDen": int_den,
+    "Circularity": circularity,
+    "Feret": feret_pixels,
+    "Perimeter": perimeter_pixels,
+    "TouchesBoundary": touches_boundary,
     }
 
 def objective(params, empirical_data, targets, N_grid=80, L=1.0, dt=0.002, threshold=0.2):
-    """
-    Objective function for optimization.
+    (
+        lambda_,
+        delta,
+        k_n,
+        k_p,
+        k_d,
+        alpha,
+        beta,
+        R0,
+        time_scale,
+        pixel_scale,
+        intensity_scale,
+    ) = params
 
-    Parameters
-    ----------
-    params : list or array
-        Model and scaling parameters:
-        [D_N, D_H, gamma, alpha, beta, R0, time_scale, pixel_scale, intensity_scale]
-
-    empirical_data : DataFrame
-        Loaded empirical data table.
-
-    targets : list of str
-        Names of observables to fit, for example:
-        ["Radius", "GrayMean", "IntDen"]
-
-    Returns
-    -------
-    error : float
-        Sum of squared weighted residuals.
-    """
-
-    D_N, D_H, gamma, alpha, beta, R0, time_scale, pixel_scale, intensity_scale = params
-
-    # Basic safety checks
-    if D_N <= 0 or D_H <= 0 or gamma < 0 or alpha < 0 or beta < 0:
-        return 1e30
-
-    if R0 <= 0 or time_scale <= 0 or pixel_scale <= 0 or intensity_scale <= 0:
+    if (
+        lambda_ <= 0 or delta <= 0 or
+        k_n <= 0 or k_p <= 0 or k_d <= 0 or
+        alpha < 0 or beta < 0 or
+        R0 <= 0 or time_scale <= 0 or
+        pixel_scale <= 0 or intensity_scale <= 0
+    ):
         return 1e30
 
     empirical_days = empirical_data["Day"].values
 
     try:
         sim_results = simulate_model(
-            params=[D_N, D_H, gamma, alpha, beta, R0, time_scale],
+            params=[
+                lambda_,
+                delta,
+                k_n,
+                k_p,
+                k_d,
+                alpha,
+                beta,
+                R0,
+                time_scale,
+            ],
             empirical_days=empirical_days,
             N_grid=N_grid,
             L=L,
@@ -225,33 +265,37 @@ def objective(params, empirical_data, targets, N_grid=80, L=1.0, dt=0.002, thres
             intensity_scale=intensity_scale,
             threshold=threshold,
         )
+        if obs.get("TouchesBoundary", False):
+            return 1e30
 
         for target in targets:
             mean_col = f"Mean{target}"
             std_col = f"Std{target}"
-        
+
             if mean_col not in empirical_data.columns:
-                continue
-        
+                return 1e30
+
             empirical_mean = row[mean_col]
             model_value = obs[target]
-        
+
             if std_col in empirical_data.columns:
                 sigma = row[std_col]
             else:
                 sigma = 1.0
-        
+
             if pd.isna(empirical_mean):
                 continue
-        
-            # Critical: failed model prediction is not acceptable
+
             if pd.isna(model_value):
                 return 1e30
-        
+
             if pd.isna(sigma) or sigma <= 0:
                 sigma = 1.0
-        
-            residuals.append((model_value - empirical_mean) / sigma)
+                
+            
+
+            weight = target_weights.get(target, 1.0)
+            residuals.append(np.sqrt(weight) * (model_value - empirical_mean) / sigma)
 
     if len(residuals) == 0:
         return 1e30
@@ -273,34 +317,82 @@ def laplacian(Z, dx):
     lap = (Z_top + Z_bottom + Z_left + Z_right - 4 * Z_center) / dx**2
     return lap
 
-def step(N, H, D_N, D_H, gamma, alpha, beta, dx, dt):
-    lap_N = laplacian(N, dx)
-    lap_H = laplacian(H, dx)
+def step(n, h, lambda_, delta, k_n, k_p, k_d, alpha, beta, dx, dt):
+    lap_n = laplacian(n, dx)
+    lap_h = laplacian(h, dx)
 
-    N_new = N.copy()
-    H_new = H.copy()
+    n_new = n.copy()
+    h_new = h.copy()
 
-    N_new[1:-1, 1:-1] += dt * (D_N * lap_N - gamma * H[1:-1, 1:-1])
-    H_new[1:-1, 1:-1] += dt * (
-    D_H * lap_H
-    + alpha * N[1:-1, 1:-1] * H[1:-1, 1:-1] * (1 - H[1:-1, 1:-1])
-    - beta * (1 - N[1:-1, 1:-1]) * H[1:-1, 1:-1]
+    eps = 1e-12
+
+    consumption = lambda_ * n[1:-1, 1:-1] / (k_n + n[1:-1, 1:-1] + eps) * h[1:-1, 1:-1]
+
+    proliferation = (
+        alpha
+        * n[1:-1, 1:-1] / (k_p + n[1:-1, 1:-1] + eps)
+        * h[1:-1, 1:-1]
+        * (1 - h[1:-1, 1:-1])
     )
 
-    N_new[0, :] = N_new[-1, :] = N_new[:, 0] = N_new[:, -1] = 1.0
+    death = (
+        beta
+        * k_d / (k_d + n[1:-1, 1:-1] + eps)
+        * h[1:-1, 1:-1]
+    )
 
-    H_new[0, :]  = H_new[1, :]
-    H_new[-1, :] = H_new[-2, :]
-    H_new[:, 0]  = H_new[:, 1]
-    H_new[:, -1] = H_new[:, -2]
+    n_new[1:-1, 1:-1] += dt * (lap_n - consumption)
 
-    return N_new, H_new 
+    h_new[1:-1, 1:-1] += dt * (
+        delta * lap_h
+        + proliferation
+        - death
+    )
+
+    # Dirichlet BC for nutrient
+    n_new[0, :] = 1.0
+    n_new[-1, :] = 1.0
+    n_new[:, 0] = 1.0
+    n_new[:, -1] = 1.0
+
+    # Neumann BC for h
+    h_new[0, :] = h_new[1, :]
+    h_new[-1, :] = h_new[-2, :]
+    h_new[:, 0] = h_new[:, 1]
+    h_new[:, -1] = h_new[:, -2]
+
+    n_new = np.clip(n_new, 0.0, 1.0)
+    h_new = np.clip(h_new, 0.0, 1.0)
+
+    return n_new, h_new
 
 def evaluate_fit(params, empirical_data, targets, N_grid=80, L=1.0, dt=0.002, threshold=0.2):
-    D_N, D_H, gamma, alpha, beta, R0, time_scale, pixel_scale, intensity_scale = params
+    (
+        lambda_,
+        delta,
+        k_n,
+        k_p,
+        k_d,
+        alpha,
+        beta,
+        R0,
+        time_scale,
+        pixel_scale,
+        intensity_scale,
+    ) = params
 
     sim_results = simulate_model(
-        params=[D_N, D_H, gamma, alpha, beta, R0, time_scale],
+        params=[
+            lambda_,
+            delta,
+            k_n,
+            k_p,
+            k_d,
+            alpha,
+            beta,
+            R0,
+            time_scale,
+        ],
         empirical_days=empirical_data["Day"].values,
         N_grid=N_grid,
         L=L,
@@ -375,16 +467,18 @@ def save_fit_results(
 
     # Named parameters
     param_names = [
-        "D_N",
-        "D_H",
-        "gamma",
-        "alpha",
-        "beta",
-        "R0",
-        "time_scale",
-        "pixel_scale",
-        "intensity_scale",
-    ]
+    "lambda_",
+    "delta",
+    "k_n",
+    "k_p",
+    "k_d",
+    "alpha",
+    "beta",
+    "R0",
+    "time_scale",
+    "pixel_scale",
+    "intensity_scale",
+]
 
     fitted_parameters = {
         name: float(value)
@@ -394,13 +488,13 @@ def save_fit_results(
     # Save compact summary
     summary = {
         "equations": [
-            "N_t = D_N * laplacian(N) - gamma * H",
-            "H_t = D_H * laplacian(H) + alpha * N * H * (1 - H) - beta * (1 - N) * H",
-        ],
+    "n_t = laplacian(n) - lambda_ * n / (k_n + n) * h",
+    "h_t = delta * laplacian(h) + alpha * n / (k_p + n) * h * (1 - h) - beta * k_d / (k_d + n) * h",
+    ],
         "boundary_conditions": {
-            "N": "Dirichlet N = 1",
-            "H": "Neumann zero-flux",
-        },
+    "n": "Dirichlet n = 1",
+    "h": "Neumann zero-flux"
+    },
         "targets": targets,
         "fitted_parameters": fitted_parameters,
         "optimizer": {
@@ -428,9 +522,73 @@ def save_fit_results(
 
     return fit_table
 
+def save_fit_plots(fit_table, out_dir="fit_output"):
+    os.makedirs(out_dir, exist_ok=True)
+
+    plot_specs = [
+        ("Radius", "Radius"),
+        ("GrayMean", "Mean gray value"),
+        ("IntDen", "Integrated density"),
+        ("Feret", "Feret diameter"),
+        ("Perimeter", "Perimeter"),
+    ]
+
+    for target, ylabel in plot_specs:
+        empirical_col = f"Empirical{target}"
+        model_col = f"Model{target}"
+        std_col = f"Std{target}"
+
+        if empirical_col not in fit_table.columns or model_col not in fit_table.columns:
+            continue
+
+        plt.figure(figsize=(6, 4))
+
+        if std_col in fit_table.columns:
+            plt.errorbar(
+                fit_table["Day"],
+                fit_table[empirical_col],
+                yerr=fit_table[std_col],
+                fmt="o",
+                capsize=3,
+                label="Empirical",
+            )
+        else:
+            plt.plot(
+                fit_table["Day"],
+                fit_table[empirical_col],
+                "o",
+                label="Empirical",
+            )
+
+        plt.plot(
+            fit_table["Day"],
+            fit_table[model_col],
+            "-o",
+            label="Model",
+        )
+
+        plt.xlabel("Day")
+        plt.ylabel(ylabel)
+        plt.legend()
+        plt.tight_layout()
+
+        filename = f"{target}_fit.png"
+        plt.savefig(os.path.join(out_dir, filename), dpi=300)
+        plt.close()
+        
+def objective_L3(params, empirical_data, targets):
+    return objective(
+        params,
+        empirical_data,
+        targets,
+        N_grid=81,
+        L=3.0,
+        dt=0.002,
+        threshold=0.2,
+    )
 
 # Grid
-L = 1.0                # Domain size: from -L to L
+L = 3.0                # Domain size: from -L to L
 N_grid = 200           # Grid resolution (N x N)
 dx = 2 * L / N_grid
 x = np.linspace(-L, L, N_grid)
@@ -444,13 +602,6 @@ steps = int(T_max / dt)
 output_every = 500     # Save every N steps
 
 
-# Model parameters
-D_N = 0.01      # Nutrient diffusion
-D_H = 0.001     # Health smoothing
-gamma = 0.05    # Nutrient consumption rate
-alpha = 0.3     # Proliferation rate
-beta = 0.2  
-
 # Initial conditions
 N_max = 1.0
 R0 = 0.1             # Initial spheroid radius
@@ -462,11 +613,6 @@ H = H_init * np.exp(-(X**2 + Y**2) / (2 * (R0 / 2)**2))
 
 os.makedirs("output", exist_ok=True)
 
-targets = [
-    "Radius",
-    "GrayMean",
-    "IntDen",
-]
 
 fit_uncertainties = [
     "StdRadius",
@@ -474,6 +620,21 @@ fit_uncertainties = [
     "StdIntDen",
 ]
 
+targets = [
+    "Radius",
+    "GrayMean",
+    "IntDen",
+    "Feret",
+    "Perimeter",
+]
+
+target_weights = {
+    "Radius": 1.0,
+    "GrayMean": 1.0,
+    "IntDen": 1.0,
+    "Feret": 0.25,
+    "Perimeter": 0.25,
+}
 
 target_columns = {
     "Radius": ("MeanRadius", "StdRadius"),
@@ -484,21 +645,23 @@ target_columns = {
 empirical_data = load_empirical_data("500.txt")
 
 bounds = [
-    (1e-4, 5e-2),   # D_N
-    (1e-5, 1e-2),   # D_H
-    (1e-4, 1.0),    # gamma
-    (1e-3, 2.0),    # alpha
-    (1e-4, 2.0),    # beta
-    (0.02, 0.3),    # R0
-    (0.1, 5.0),     # time_scale
-    (100, 1000),    # pixel_scale
-    (1, 255),       # intensity_scale
+    (1e-3, 10.0),    # lambda_
+    (1e-5, 1e-1),    # delta
+    (1e-3, 1.0),     # k_n
+    (1e-3, 1.0),     # k_p
+    (1e-3, 1.0),     # k_d
+    (1e-3, 10.0),    # alpha
+    (1e-3, 10.0),    # beta
+    (0.15, 0.5),     # R0
+    (0.05, 5.0),     # time_scale
+    (300, 900),      # pixel_scale
+    (150, 255),       # intensity_scale
 ]
 
 
 
 result = differential_evolution(
-    objective,
+    objective_L3,
     bounds=bounds,
     args=(empirical_data, targets),
     maxiter=15,
@@ -509,53 +672,23 @@ result = differential_evolution(
     seed=None,
 )
 
-print("Best error:", result.fun)
-print("Best parameters:", result.x)
+if result.fun >= 1e29:
+    print("⚠️ No valid fit found. Best objective is still penalty value.")
+    print("Try larger R0 lower bound, lower threshold, or larger N_grid.")
+else:
+    fit_table = save_fit_results(
+        result=result,
+        empirical_data=empirical_data,
+        targets=targets,
+        out_dir="fit_output",
+        N_grid=81,
+        L=3.0,
+        dt=0.002,
+        threshold=0.2,
+    )
+    save_fit_plots(fit_table, out_dir="fit_output")
 
-fit_table = save_fit_results(
-    result=result,
-    empirical_data=empirical_data,
-    targets=targets,
-    out_dir="fit_output",
-    N_grid=80,
-    L=1.0,
-    dt=0.002,
-    threshold=0.2,
-)
-print(fit_table)
-'''
-N, H = step(N, H, D_N, D_H, gamma, alpha, beta, dx, dt)
-#plt.imshow(H, extent=[-L, L, -L, L], origin='lower', cmap='YlOrRd', vmin=0, vmax=1.0)
-#plt.title('Health')
-#plt.colorbar(label='Health level')
-cy, cx, r,_,_,_ = bf.make_circle(H)
-theta = np.linspace(0, 2*np.pi, 500)
-
-plt.imshow(H, origin="lower", cmap="YlOrRd")
-plt.plot(cx + r*np.cos(theta), cy + r*np.sin(theta), linewidth=2)
-plt.scatter([cx], [cy], s=20)
-plt.show()
-
-
-for t in range(steps):
-    N, H = step(N, H, D_N, D_H, gamma, alpha, beta, dx, dt)
-
-    if t % output_every == 0:
-        print(f"Step {t}/{steps}")
-
-        plt.figure(figsize=(12, 5))
-
-        plt.subplot(1, 2, 1)
-        plt.imshow(N, extent=[-L, L, -L, L], origin='lower', cmap='Blues', vmin=0, vmax=1.0)
-        plt.title(f'Nutrient (t={t*dt:.2f})')
-        plt.colorbar(label='Nutrient level')
-
-        plt.subplot(1, 2, 2)
-        plt.imshow(H, extent=[-L, L, -L, L], origin='lower', cmap='YlOrRd', vmin=0, vmax=1.0)
-        plt.title(f'Health (t={t*dt:.2f})')
-        plt.colorbar(label='Health level')
-
-        plt.tight_layout()
-        plt.savefig(f"output/step_{t:05d}.png")
-        plt.close()
-'''
+    print("Best error:", result.fun)
+    print("Best parameters:", result.x) 
+              
+    print(fit_table)

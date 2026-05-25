@@ -286,6 +286,21 @@ def area_from_mask(mask_area, dx=1.0):
 
 
 def perimeter_from_mask(mask_area, dx=1.0):
+    """
+    Estimate the outer perimeter of a binary mask.
+
+    Parameters
+    ----------
+    mask_area : 2D bool array
+        Filled spheroid mask.
+    dx : float
+        Physical size of one grid cell. If dx=1, result is in pixels.
+
+    Returns
+    -------
+    perimeter : float
+        Perimeter in the same length units as dx.
+    """
     if not np.any(mask_area):
         return np.nan
 
@@ -294,23 +309,26 @@ def perimeter_from_mask(mask_area, dx=1.0):
     if len(contours) == 0:
         return np.nan
 
+    # longest contour = external boundary
     contour = max(contours, key=len)
 
+    # contour coordinates are [row, col] in pixel/grid units
     diffs = np.diff(contour, axis=0)
     segment_lengths = np.sqrt(diffs[:, 0]**2 + diffs[:, 1]**2)
 
-    perimeter = np.sum(segment_lengths)
+    perimeter_pixels = np.sum(segment_lengths)
 
+    # Close the contour if skimage returned it open
+    closing_segment = np.linalg.norm(contour[0] - contour[-1])
+    if closing_segment > 1e-12:
+        perimeter_pixels += closing_segment
 
-    if np.linalg.norm(contour[0] - contour[-1]) > 1e-12:
-        perimeter += np.linalg.norm(contour[0] - contour[-1])
-
-    return perimeter * dx
+    return perimeter_pixels * dx
 
 def circularity(H, dx=1.0, threshold=0.2):
     mask_area = get_spheroid_mask(H, threshold)
 
-    area,_ = area_from_mask(mask_area, dx)
+    area = area_from_mask(mask_area, dx)
     perimeter = perimeter_from_mask(mask_area, dx)
 
     if perimeter == 0 or np.isnan(perimeter):
@@ -321,6 +339,24 @@ def circularity(H, dx=1.0, threshold=0.2):
     return circ
 
 def feret_diameter_from_mask(mask_area, dx=1.0):
+    """
+    Estimate Feret's diameter of a binary mask.
+
+    Feret diameter is calculated as the maximum distance between points
+    on the convex hull of the outer contour.
+
+    Parameters
+    ----------
+    mask_area : 2D bool array
+        Filled spheroid mask.
+    dx : float
+        Physical size of one grid cell. If dx=1, result is in pixels.
+
+    Returns
+    -------
+    feret : float
+        Feret diameter in the same length units as dx.
+    """
     if not np.any(mask_area):
         return np.nan
 
@@ -329,24 +365,28 @@ def feret_diameter_from_mask(mask_area, dx=1.0):
     if len(contours) == 0:
         return np.nan
 
+    # longest contour = external boundary
     contour = max(contours, key=len)
-    points = np.column_stack((contour[:, 1], contour[:, 0])) * dx
 
-    if len(points) < 2:
+    # contour is [row, col]; convert to [x, y] in pixel/grid units
+    points_pixels = np.column_stack((contour[:, 1], contour[:, 0]))
+
+    if len(points_pixels) < 2:
         return np.nan
 
-    if len(points) == 2:
-        return np.linalg.norm(points[1] - points[0])
+    if len(points_pixels) == 2:
+        return np.linalg.norm(points_pixels[1] - points_pixels[0]) * dx
 
     try:
-        hull = ConvexHull(points)
-        hull_points = points[hull.vertices]
+        hull = ConvexHull(points_pixels)
+        hull_points = points_pixels[hull.vertices]
     except QhullError:
-        D = distance_matrix(points, points)
-        return np.max(D)
+        hull_points = points_pixels
 
     D = distance_matrix(hull_points, hull_points)
-    return np.max(D)
+    feret_pixels = np.max(D)
+
+    return feret_pixels * dx
 
 def integrated_density(H, mask_area, dx=1.0):
     values = H[mask_area]
