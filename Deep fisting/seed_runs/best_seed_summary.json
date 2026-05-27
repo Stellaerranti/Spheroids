@@ -1,0 +1,20 @@
+{
+  "seed": 3,
+  "error": 53.676490989386195,
+  "success": false,
+  "message": "Maximum number of iterations has been exceeded.",
+  "iterations": 50,
+  "function_evaluations": 4740,
+  "valid_fit": true,
+  "lambda_": 7.27436059729688,
+  "delta": 0.0028885106235916405,
+  "k_n": 0.34349330541351925,
+  "k_p": 0.27682994492515706,
+  "k_d": 0.17338349341810294,
+  "alpha": 6.548445518818127,
+  "beta": 1.897294637527048,
+  "R0": 0.40561590180942664,
+  "time_scale": 0.16201961855096259,
+  "pixel_scale": 445.32800978922063,
+  "intensity_scale": 228.1608906686972
+}

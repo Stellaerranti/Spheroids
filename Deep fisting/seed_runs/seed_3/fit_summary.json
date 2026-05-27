@@ -15,25 +15,25 @@
     "Perimeter"
   ],
   "fitted_parameters": {
-    "lambda_": 9.262160233335699,
-    "delta": 0.007204761192964065,
-    "k_n": 0.5187013008540682,
-    "k_p": 0.24155574772258687,
-    "k_d": 0.8471560564676872,
-    "alpha": 7.51262428295207,
-    "beta": 0.9034006672972756,
-    "R0": 0.2838113050540096,
-    "time_scale": 0.05805310517994444,
-    "pixel_scale": 705.2430836961596,
-    "intensity_scale": 215.1226461272562
+    "lambda_": 7.27436059729688,
+    "delta": 0.0028885106235916405,
+    "k_n": 0.34349330541351925,
+    "k_p": 0.27682994492515706,
+    "k_d": 0.17338349341810294,
+    "alpha": 6.548445518818127,
+    "beta": 1.897294637527048,
+    "R0": 0.40561590180942664,
+    "time_scale": 0.16201961855096259,
+    "pixel_scale": 445.32800978922063,
+    "intensity_scale": 228.1608906686972
   },
   "optimizer": {
     "method": "differential_evolution",
     "success": false,
     "message": "Maximum number of iterations has been exceeded.",
-    "error": 62.216644292224075,
+    "error": 53.676490989386195,
     "iterations": 50,
-    "function_evaluations": 4524
+    "function_evaluations": 4740
   },
   "simulation": {
     "N_grid": 81,

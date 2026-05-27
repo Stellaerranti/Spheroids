@@ -575,6 +575,116 @@ def save_fit_plots(fit_table, out_dir="fit_output"):
         filename = f"{target}_fit.png"
         plt.savefig(os.path.join(out_dir, filename), dpi=300)
         plt.close()
+
+def run_seed_series(
+    seeds,
+    empirical_data,
+    targets,
+    bounds,
+    out_dir="seed_runs",
+    maxiter=50,
+    popsize=8,
+    N_grid=81,
+    L=3.0,
+    dt=0.002,
+    threshold=0.2,
+):
+    os.makedirs(out_dir, exist_ok=True)
+
+    all_rows = []
+
+    for seed in seeds:
+        print(f"\nRunning seed {seed}...")
+
+        def objective_fixed(params, empirical_data, targets):
+            return objective(
+                params,
+                empirical_data,
+                targets,
+                N_grid=N_grid,
+                L=L,
+                dt=dt,
+                threshold=threshold,
+            )
+
+        result = differential_evolution(
+            objective_fixed,
+            bounds=bounds,
+            args=(empirical_data, targets),
+            maxiter=maxiter,
+            popsize=popsize,
+            polish=True,
+            workers=1,
+            updating="immediate",
+            seed=seed,
+        )
+
+        seed_dir = os.path.join(out_dir, f"seed_{seed}")
+        os.makedirs(seed_dir, exist_ok=True)
+
+        if result.fun < 1e29:
+            fit_table = save_fit_results(
+                result=result,
+                empirical_data=empirical_data,
+                targets=targets,
+                out_dir=seed_dir,
+                N_grid=N_grid,
+                L=L,
+                dt=dt,
+                threshold=threshold,
+            )
+
+            save_fit_plots(fit_table, out_dir=seed_dir)
+        else:
+            fit_table = None
+
+        param_names = [
+            "lambda_",
+            "delta",
+            "k_n",
+            "k_p",
+            "k_d",
+            "alpha",
+            "beta",
+            "R0",
+            "time_scale",
+            "pixel_scale",
+            "intensity_scale",
+        ]
+
+        row = {
+            "seed": seed,
+            "error": float(result.fun),
+            "success": bool(result.success),
+            "message": str(result.message),
+            "iterations": int(result.nit),
+            "function_evaluations": int(result.nfev),
+            "valid_fit": bool(result.fun < 1e29),
+        }
+
+        for name, value in zip(param_names, result.x):
+            row[name] = float(value)
+
+        all_rows.append(row)
+
+        print(f"Seed {seed}: error = {result.fun}")
+
+    summary_table = pd.DataFrame(all_rows)
+    summary_table = summary_table.sort_values("error").reset_index(drop=True)
+
+    summary_path = os.path.join(out_dir, "seed_summary.csv")
+    summary_table.to_csv(summary_path, index=False)
+
+    # Save best parameters separately
+    best = summary_table.iloc[0].to_dict()
+
+    with open(os.path.join(out_dir, "best_seed_summary.json"), "w", encoding="utf-8") as f:
+        json.dump(best, f, indent=2)
+
+    print("\nBest seed:")
+    print(summary_table.iloc[0])
+
+    return summary_table
         
 def objective_L3(params, empirical_data, targets):
     return objective(
@@ -645,27 +755,46 @@ target_columns = {
 empirical_data = load_empirical_data("500.txt")
 
 bounds = [
-    (1e-3, 10.0),    # lambda_
-    (1e-5, 1e-1),    # delta
-    (1e-3, 1.0),     # k_n
-    (1e-3, 1.0),     # k_p
-    (1e-3, 1.0),     # k_d
-    (1e-3, 10.0),    # alpha
-    (1e-3, 10.0),    # beta
-    (0.15, 0.5),     # R0
-    (0.05, 5.0),     # time_scale
-    (300, 900),      # pixel_scale
-    (150, 255),       # intensity_scale
+    (2.0, 10.0),     # lambda_
+    (1e-5, 0.04),    # delta
+    (0.3, 1.0),      # k_n
+    (0.2, 0.7),      # k_p
+    (0.05, 0.4),     # k_d
+    (4.0, 8.0),      # alpha
+    (0.3, 2.0),      # beta
+    (0.28, 0.45),    # R0
+    (0.03, 0.35),    # time_scale
+    (430, 650),      # pixel_scale
+    (200, 255),      # intensity_scale
 ]
 
 
+seeds = [1, 2, 3, 4, 5]
+
+seed_summary = run_seed_series(
+    seeds=seeds,
+    empirical_data=empirical_data,
+    targets=targets,
+    bounds=bounds,
+    out_dir="seed_runs",
+    maxiter=50,
+    popsize=8,
+    N_grid=81,
+    L=3.0,
+    dt=0.002,
+    threshold=0.2,
+)
+
+print(seed_summary)
+
+'''
 
 result = differential_evolution(
     objective_L3,
     bounds=bounds,
     args=(empirical_data, targets),
-    maxiter=15,
-    popsize=6,
+    maxiter=50,
+    popsize=8,
     polish=True,
     workers=1,
     updating="immediate",
@@ -692,3 +821,4 @@ else:
     print("Best parameters:", result.x) 
               
     print(fit_table)
+'''
