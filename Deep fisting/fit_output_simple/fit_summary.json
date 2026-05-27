@@ -1,0 +1,44 @@
+{
+  "equations": [
+    "N_t = D_N * laplacian(N) - gamma * H",
+    "H_t = D_H * laplacian(H) + alpha * N * H * (1 - H) - beta * (1 - N) * H"
+  ],
+  "boundary_conditions": {
+    "N": "Dirichlet N = 1",
+    "H": "Neumann zero-flux"
+  },
+  "targets": [
+    "Radius",
+    "GrayMean",
+    "IntDen"
+  ],
+  "fitted_parameters": {
+    "D_N": 0.0332627796854339,
+    "D_H": 0.0020065136312031467,
+    "gamma": 0.7243780526765112,
+    "alpha": 1.9863728471520532,
+    "beta": 0.23605385012848223,
+    "R0": 0.2906767462449036,
+    "time_scale": 2.2033444120119983,
+    "pixel_scale": 241.89758050197463,
+    "intensity_scale": 238.22008149595425
+  },
+  "optimizer": {
+    "method": "differential_evolution",
+    "success": false,
+    "message": "Maximum number of iterations has been exceeded.",
+    "error": 87.40029071076962,
+    "iterations": 15,
+    "function_evaluations": 894
+  },
+  "simulation": {
+    "N_grid": 81,
+    "L": 1.0,
+    "dt": 0.002,
+    "threshold": 0.2
+  },
+  "output_files": {
+    "fit_table": "fit_table.csv",
+    "fit_summary": "fit_summary.json"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "equations": [
+    "n_t = laplacian(n) - lambda_ * n / (k_n + n) * h",
+    "h_t = delta * laplacian(h) + alpha * n / (k_p + n) * h * (1 - h) - beta * k_d / (k_d + n) * h"
+  ],
+  "boundary_conditions": {
+    "n": "Dirichlet n = 1",
+    "h": "Neumann zero-flux"
+  },
+  "targets": [
+    "Radius",
+    "GrayMean",
+    "IntDen",
+    "Feret",
+    "Perimeter"
+  ],
+  "fitted_parameters": {
+    "lambda_": 7.665631459994952,
+    "delta": 0.005096953565744073,
+    "k_n": 0.5673762078750735,
+    "k_p": 0.31803398874989486,
+    "k_d": 0.35597068642428764,
+    "alpha": 6.787095444709014,
+    "beta": 1.8716535534911265,
+    "R0": 0.3843483190801449,
+    "time_scale": 0.1593291349743125,
+    "pixel_scale": 467.9197644249489,
+    "intensity_scale": 242.79634723942905
+  },
+  "optimizer": {
+    "method": "differential_evolution",
+    "success": true,
+    "message": "Optimization terminated successfully.",
+    "error": 57.512400442788355,
+    "iterations": 2,
+    "function_evaluations": 341
+  },
+  "simulation": {
+    "N_grid": 81,
+    "L": 3.0,
+    "dt": 0.002,
+    "threshold": 0.2
+  },
+  "output_files": {
+    "fit_table": "fit_table.csv",
+    "fit_summary": "fit_summary.json"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "equations": [
+    "n_t = laplacian(n) - lambda_ * n / (k_n + n) * h",
+    "h_t = delta * laplacian(h) + alpha * n / (k_p + n) * h * (1 - h) - beta * k_d / (k_d + n) * h"
+  ],
+  "boundary_conditions": {
+    "n": "Dirichlet n = 1",
+    "h": "Neumann zero-flux"
+  },
+  "targets": [
+    "Radius",
+    "GrayMean",
+    "IntDen",
+    "Feret",
+    "Perimeter"
+  ],
+  "fitted_parameters": {
+    "lambda_": 5.5478757252535456,
+    "delta": 0.03620348779075887,
+    "k_n": 0.8791423088816372,
+    "k_p": 0.20781644928972262,
+    "k_d": 0.2314674731939398,
+    "alpha": 7.493271036648626,
+    "beta": 1.2376995558766897,
+    "R0": 0.4301800939723793,
+    "time_scale": 0.032762844740228836,
+    "pixel_scale": 489.26088453403304,
+    "intensity_scale": 222.06918143568038
+  },
+  "optimizer": {
+    "method": "unknown",
+    "success": false,
+    "message": "Maximum number of iterations has been exceeded.",
+    "error": 65.3281911982444,
+    "iterations": 50,
+    "function_evaluations": 4812
+  },
+  "simulation": {
+    "N_grid": 81,
+    "L": 3.0,
+    "dt": 0.002,
+    "threshold": 0.2
+  },
+  "output_files": {
+    "fit_table": "fit_table.csv",
+    "fit_summary": "fit_summary.json"
+  },
+  "late_saturation_penalty": {
+    "enabled": true,
+    "targets": [
+      "Radius",
+      "IntDen"
+    ],
+    "start_day": 13,
+    "weight": 50.0
+  }
+}

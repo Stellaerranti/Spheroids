@@ -8,6 +8,7 @@ import os
 import json
 import numpy as np
 import pandas as pd
+from scipy.optimize import minimize
 
 def load_empirical_data(path):
     data = pd.read_csv(path, sep="\t", skiprows=1)
@@ -248,6 +249,7 @@ def objective(params, empirical_data, targets, N_grid=80, L=1.0, dt=0.002, thres
         return 1e30
 
     residuals = []
+    model_rows = []
 
     for _, row in empirical_data.iterrows():
         day = row["Day"]
@@ -265,6 +267,13 @@ def objective(params, empirical_data, targets, N_grid=80, L=1.0, dt=0.002, thres
             intensity_scale=intensity_scale,
             threshold=threshold,
         )
+        model_rows.append({
+    "Day": day,
+    "Radius": obs["Radius"],
+    "IntDen": obs["IntDen"],
+    "Feret": obs["Feret"],
+    "Perimeter": obs["Perimeter"],
+})
         if obs.get("TouchesBoundary", False):
             return 1e30
 
@@ -304,8 +313,17 @@ def objective(params, empirical_data, targets, N_grid=80, L=1.0, dt=0.002, thres
 
     if not np.all(np.isfinite(residuals)):
         return 1e30
+    
+    base_error = np.sum(residuals**2)
 
-    return np.sum(residuals**2)
+    sat_penalty = late_saturation_penalty(
+    model_rows,
+    empirical_data,
+    start_day=13,
+    weight=5.0,
+    )
+    
+    return base_error + sat_penalty
 
 def laplacian(Z, dx):
     Z_top    = Z[:-2, 1:-1]
@@ -446,6 +464,7 @@ def save_fit_results(
     L=1.0,
     dt=0.002,
     threshold=0.2,
+    optimizer_name="unknown",
 ):
     os.makedirs(out_dir, exist_ok=True)
 
@@ -498,7 +517,7 @@ def save_fit_results(
         "targets": targets,
         "fitted_parameters": fitted_parameters,
         "optimizer": {
-            "method": "differential_evolution",
+            "method": optimizer_name,
             "success": bool(result.success),
             "message": str(result.message),
             "error": float(result.fun),
@@ -514,6 +533,12 @@ def save_fit_results(
         "output_files": {
             "fit_table": "fit_table.csv",
             "fit_summary": "fit_summary.json",
+        },
+        "late_saturation_penalty": {
+            "enabled": True,
+            "targets": ["Radius", "IntDen"],
+            "start_day": 13,
+            "weight": 50.0,
         },
     }
 
@@ -575,6 +600,97 @@ def save_fit_plots(fit_table, out_dir="fit_output"):
         filename = f"{target}_fit.png"
         plt.savefig(os.path.join(out_dir, filename), dpi=300)
         plt.close()
+
+def compute_objective_parts(params, empirical_data, targets, N_grid=81, L=3.0, dt=0.002, threshold=0.2):
+    (
+        lambda_,
+        delta,
+        k_n,
+        k_p,
+        k_d,
+        alpha,
+        beta,
+        R0,
+        time_scale,
+        pixel_scale,
+        intensity_scale,
+    ) = params
+
+    sim_results = simulate_model(
+        params=[
+            lambda_,
+            delta,
+            k_n,
+            k_p,
+            k_d,
+            alpha,
+            beta,
+            R0,
+            time_scale,
+        ],
+        empirical_days=empirical_data["Day"].values,
+        N_grid=N_grid,
+        L=L,
+        dt=dt,
+    )
+
+    residuals = []
+    model_rows = []
+
+    for _, row in empirical_data.iterrows():
+        day = row["Day"]
+
+        H = sim_results[day]["H"]
+        dx = sim_results[day]["dx"]
+
+        obs = calculate_model_observables(
+            H,
+            dx=dx,
+            pixel_scale=pixel_scale,
+            intensity_scale=intensity_scale,
+            threshold=threshold,
+        )
+
+        model_rows.append({
+            "Day": day,
+            "Radius": obs["Radius"],
+            "IntDen": obs["IntDen"],
+            "Feret": obs["Feret"],
+            "Perimeter": obs["Perimeter"],
+        })
+
+        for target in targets:
+            mean_col = f"Mean{target}"
+            std_col = f"Std{target}"
+
+            empirical_mean = row[mean_col]
+            model_value = obs[target]
+            sigma = row[std_col]
+
+            if pd.isna(empirical_mean) or pd.isna(model_value):
+                continue
+
+            if pd.isna(sigma) or sigma <= 0:
+                sigma = 1.0
+
+            weight = target_weights.get(target, 1.0)
+            residuals.append(np.sqrt(weight) * (model_value - empirical_mean) / sigma)
+
+    residuals = np.array(residuals)
+    base_error = np.sum(residuals**2)
+
+    sat_penalty = late_saturation_penalty(
+        model_rows,
+        targets=("Radius", "IntDen"),
+        start_day=13,
+        weight=50.0,
+    )
+
+    return {
+        "base_error": base_error,
+        "sat_penalty": sat_penalty,
+        "total_error": base_error + sat_penalty,
+    }
 
 def run_seed_series(
     seeds,
@@ -685,6 +801,49 @@ def run_seed_series(
     print(summary_table.iloc[0])
 
     return summary_table
+
+def late_saturation_penalty(model_rows, empirical_data, start_day=13, weight=1.0):
+    """
+    Penalizes positive late-time growth after start_day,
+    scaled by empirical standard deviations.
+    """
+
+    penalty = 0.0
+
+    rows = sorted(model_rows, key=lambda r: r["Day"])
+    late_rows = [r for r in rows if r["Day"] >= start_day]
+
+    if len(late_rows) < 2:
+        return 0.0
+
+    emp = empirical_data.set_index("Day")
+
+    for r0, r1 in zip(late_rows[:-1], late_rows[1:]):
+        d0 = r0["Day"]
+        d1 = r1["Day"]
+
+        for target in ["Radius", "IntDen"]:
+            growth = r1[target] - r0[target]
+
+            if not np.isfinite(growth):
+                continue
+
+            if growth <= 0:
+                continue
+
+            std_col = f"Std{target}"
+
+            if std_col in emp.columns and d1 in emp.index:
+                sigma = emp.loc[d1, std_col]
+            else:
+                sigma = 1.0
+
+            if pd.isna(sigma) or sigma <= 0:
+                sigma = 1.0
+
+            penalty += weight * (growth / sigma) ** 2
+
+    return penalty
         
 def objective_L3(params, empirical_data, targets):
     return objective(
@@ -761,12 +920,84 @@ bounds = [
     (0.2, 0.7),      # k_p
     (0.05, 0.4),     # k_d
     (4.0, 8.0),      # alpha
-    (0.3, 2.0),      # beta
+    (0.3, 5.0),      # beta
     (0.28, 0.45),    # R0
     (0.03, 0.35),    # time_scale
     (430, 650),      # pixel_scale
     (200, 255),      # intensity_scale
 ]
+
+with open("seed_runs/best_seed_summary.json", "r", encoding="utf-8") as f:
+    best = json.load(f)
+
+best_params = np.array([
+    best["lambda_"],
+    best["delta"],
+    best["k_n"],
+    best["k_p"],
+    best["k_d"],
+    best["alpha"],
+    best["beta"],
+    best["R0"],
+    best["time_scale"],
+    best["pixel_scale"],
+    best["intensity_scale"],
+])
+
+
+seeds = [1, 2, 3, 4, 5]
+
+seed_summary = run_seed_series(
+    seeds=seeds,
+    empirical_data=empirical_data,
+    targets=targets,
+    bounds=bounds,
+    out_dir="seed_runs_with_saturation_penalty",
+    maxiter=50,
+    popsize=8,
+    N_grid=81,
+    L=3.0,
+    dt=0.002,
+    threshold=0.2,
+)
+
+'''
+local_result = minimize(
+    objective_L3,
+    x0=best_params,
+    args=(empirical_data, targets),
+    method="Powell",
+    bounds=bounds,
+    options={
+        "maxiter": 1000,
+        "xtol": 1e-4,
+        "ftol": 1e-4,
+        "disp": True,
+    },
+)
+
+if local_result.fun >= 1e29:
+    print("⚠️ Local optimization failed.")
+else:
+    fit_table = save_fit_results(
+    result=local_result,
+    empirical_data=empirical_data,
+    targets=targets,
+    out_dir="local_fit_output",
+    N_grid=81,
+    L=3.0,
+    dt=0.002,
+    threshold=0.2,
+    optimizer_name="Powell",
+    )
+
+    save_fit_plots(fit_table, out_dir="local_fit_output")
+
+    print("Local error:", local_result.fun)
+    print("Local parameters:", local_result.x)
+    print(fit_table)
+
+
 
 
 seeds = [1, 2, 3, 4, 5]
@@ -787,7 +1018,7 @@ seed_summary = run_seed_series(
 
 print(seed_summary)
 
-'''
+
 
 result = differential_evolution(
     objective_L3,
