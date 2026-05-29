@@ -911,7 +911,7 @@ target_columns = {
     "IntDen": ("MeanIntDen", "StdIntDen"),
 }
 
-empirical_data = load_empirical_data("500.txt")
+empirical_data = load_empirical_data("1000.txt")
 
 bounds = [
     (2.0, 10.0),     # lambda_

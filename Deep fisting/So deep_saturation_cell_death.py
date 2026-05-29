@@ -855,16 +855,16 @@ bounds = [
 # ============================================================
 
 if __name__ == "__main__":
-    empirical_data = load_empirical_data("500.txt")
-    '''
-    seeds = [1, 2, 3, 4, 5]
+    empirical_data = load_empirical_data("8000.txt")
+
+    seeds = [1]
 
     seed_summary = run_seed_series(
         seeds=seeds,
         empirical_data=empirical_data,
         targets=targets,
         bounds=bounds,
-        out_dir="seed_runs_mu",
+        out_dir="seed_runs_mu_1000",
         maxiter=50,
         popsize=8,
         N_grid=N_GRID,
@@ -886,3 +886,4 @@ if __name__ == "__main__":
          L=L,
          dt=DT,
          threshold=H_THRESHOLD,)
+    '''
