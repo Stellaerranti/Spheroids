@@ -757,6 +757,7 @@ def load_best_params(path):
     return np.array(params, dtype=float)
 
 
+
 def run_powell_from_best(
     best_json_path,
     empirical_data,
@@ -768,12 +769,24 @@ def run_powell_from_best(
     dt=0.002,
     threshold=0.2,
 ):
+    os.makedirs(out_dir, exist_ok=True)
+
     best_params = load_best_params(best_json_path)
 
+    def local_objective(params):
+        return objective(
+            params,
+            empirical_data,
+            targets,
+            N_grid=N_grid,
+            L=L,
+            dt=dt,
+            threshold=threshold,
+        )
+
     local_result = minimize(
-        objective_configured,
+        local_objective,
         x0=best_params,
-        args=(empirical_data, targets),
         method="Powell",
         bounds=bounds,
         options={
@@ -784,8 +797,38 @@ def run_powell_from_best(
         },
     )
 
+    param_names = get_param_names()
+
+    local_summary = {
+        "optimizer": "Powell",
+        "success": bool(local_result.success),
+        "message": str(local_result.message),
+        "error": float(local_result.fun),
+        "iterations": int(getattr(local_result, "nit", -1)),
+        "function_evaluations": int(getattr(local_result, "nfev", -1)),
+        "valid_fit": bool(local_result.fun < 1e29),
+        "start_from": best_json_path,
+        "parameters": {
+            name: float(value)
+            for name, value in zip(param_names, local_result.x)
+        },
+        "settings": {
+            "N_grid": int(N_grid),
+            "L": float(L),
+            "dt": float(dt),
+            "threshold": float(threshold),
+            "targets": targets,
+        },
+    }
+
+    local_summary_path = os.path.join(out_dir, "powell_result_summary.json")
+
+    with open(local_summary_path, "w", encoding="utf-8") as f:
+        json.dump(local_summary, f, indent=2)
+
     if local_result.fun >= 1e29:
         print("⚠️ Local optimization failed.")
+        print(f"Powell summary saved to: {local_summary_path}")
         return local_result, None
 
     fit_table = save_fit_results(
@@ -804,6 +847,7 @@ def run_powell_from_best(
 
     print("Local error:", local_result.fun)
     print("Local parameters:", local_result.x)
+    print(f"Powell summary saved to: {local_summary_path}")
     print(fit_table)
 
     return local_result, fit_table
@@ -855,18 +899,21 @@ bounds = [
 # ============================================================
 
 if __name__ == "__main__":
-    empirical_data = load_empirical_data("8000.txt")
+    empirical_data = load_empirical_data("2000.txt")
+    '''
 
-    seeds = [1]
+
+'''
+    seeds = [1,2,3,4,5]
 
     seed_summary = run_seed_series(
         seeds=seeds,
         empirical_data=empirical_data,
         targets=targets,
         bounds=bounds,
-        out_dir="seed_runs_mu_1000",
-        maxiter=50,
-        popsize=8,
+        out_dir="seed_runs_mu_2000",
+        maxiter=150,
+        popsize=20,
         N_grid=N_GRID,
         L=L,
         dt=DT,
@@ -874,16 +921,15 @@ if __name__ == "__main__":
     )
 
     print(seed_summary)
-    '''
+
     # Optional local polishing from the best seed:
     local_result, local_fit_table = run_powell_from_best(
-         best_json_path="seed_runs_mu/best_seed_summary.json",
+         best_json_path="seed_runs_mu_2000/best_seed_summary.json",
          empirical_data=empirical_data,
          targets=targets,
          bounds=bounds,
-         out_dir="local_fit_mu",
+         out_dir="local_fit_mu_2000",
          N_grid=N_GRID,
          L=L,
          dt=DT,
          threshold=H_THRESHOLD,)
-    '''
