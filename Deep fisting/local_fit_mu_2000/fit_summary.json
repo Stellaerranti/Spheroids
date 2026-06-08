@@ -1,0 +1,61 @@
+{
+  "equations": [
+    "n_t = laplacian(n) - lambda_ * n / (k_n + n) * h",
+    "h_t = delta * laplacian(h) + alpha * n / (k_p + n) * h * (1 - h) - beta * k_d / (k_d + n) * h - mu * h"
+  ],
+  "boundary_conditions": {
+    "n": "Dirichlet n = 1",
+    "h": "Neumann zero-flux"
+  },
+  "targets": [
+    "Radius",
+    "GrayMean",
+    "IntDen",
+    "Feret",
+    "Perimeter"
+  ],
+  "target_weights": {
+    "Radius": 1.0,
+    "GrayMean": 1.0,
+    "IntDen": 1.0,
+    "Feret": 0.25,
+    "Perimeter": 0.25
+  },
+  "fitted_parameters": {
+    "lambda_": 8.111456180001682,
+    "delta": 0.0030746169373057266,
+    "k_n": 0.5268214598463948,
+    "k_p": 0.3571352679409038,
+    "k_d": 0.2706880561000461,
+    "alpha": 7.1697271779307306,
+    "beta": 1.0389165996236933,
+    "mu": 0.8082721616669037,
+    "R0": 0.4477224521788146,
+    "time_scale": 0.03068962246664699,
+    "pixel_scale": 611.3908287269937,
+    "intensity_scale": 200.00004405663887
+  },
+  "optimizer": {
+    "method": "Powell",
+    "success": true,
+    "message": "Optimization terminated successfully.",
+    "error": 26.632864207944777,
+    "iterations": 1,
+    "function_evaluations": 211
+  },
+  "simulation": {
+    "N_grid": 81,
+    "L": 3.0,
+    "dt": 0.002,
+    "threshold": 0.2
+  },
+  "model_extension": {
+    "baseline_turnover_enabled": true,
+    "mu_interpretation": "mu is inverse effective cell life expectancy in model time units",
+    "late_saturation_penalty_enabled": false
+  },
+  "output_files": {
+    "fit_table": "fit_table.csv",
+    "fit_summary": "fit_summary.json"
+  }
+}
