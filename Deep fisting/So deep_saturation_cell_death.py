@@ -1240,8 +1240,8 @@ bounds = [
 # ============================================================
 
 if __name__ == "__main__":
-    empirical_data = load_empirical_data("3375.txt")
-    '''
+    empirical_data = load_empirical_data("15625.txt")
+   
     seeds = [1,2,3,4,5]
 
     seed_summary = run_seed_series(
@@ -1249,7 +1249,7 @@ if __name__ == "__main__":
         empirical_data=empirical_data,
         targets=targets,
         bounds=bounds,
-        out_dir="seed_runs_mu_3375",
+        out_dir="seed_runs_mu_15625",
         maxiter=8,
         popsize=5,
         N_grid=N_GRID,
@@ -1259,17 +1259,17 @@ if __name__ == "__main__":
     )
 
     print(seed_summary)
-    '''
+    
     # Optional local polishing from the best seed:
     local_result, local_fit_table = run_local_from_best(
     best_json_path=(
-        "seed_runs_mu_3375/"
+        "seed_runs_mu_15625/"
         "best_seed_summary.json"
     ),
     empirical_data=empirical_data,
     targets=targets,
     bounds=bounds,
-    out_dir="local_fit_mu_3375_final",
+    out_dir="local_fit_mu_15625_final",
     N_grid=N_GRID,
     L=L,
     dt=DT,
