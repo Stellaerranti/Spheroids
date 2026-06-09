@@ -1,0 +1,37 @@
+{
+  "optimizer": "Powell",
+  "success": true,
+  "message": "Optimization terminated successfully.",
+  "error": 1e+30,
+  "iterations": 1,
+  "function_evaluations": 246,
+  "valid_fit": false,
+  "start_from": "seed_runs_mu_3375/best_seed_summary.json",
+  "parameters": {
+    "lambda_": 5.068202676879677,
+    "delta": 0.015664841040908487,
+    "k_n": 0.7320372643595185,
+    "k_p": 0.5088662410127793,
+    "k_d": 0.13052863906282125,
+    "alpha": 6.47213595499958,
+    "beta": 4.999960040261981,
+    "mu": 2.9999576164798567,
+    "R0": 0.4499563060080382,
+    "time_scale": 0.34994461751305206,
+    "pixel_scale": 649.9999604045707,
+    "intensity_scale": 254.99995628174025
+  },
+  "settings": {
+    "N_grid": 81,
+    "L": 3.0,
+    "dt": 0.002,
+    "threshold": 0.2,
+    "targets": [
+      "Radius",
+      "GrayMean",
+      "IntDen",
+      "Feret",
+      "Perimeter"
+    ]
+  }
+}

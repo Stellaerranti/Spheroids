@@ -784,6 +784,17 @@ def run_powell_from_best(
             threshold=threshold,
         )
 
+    initial_error = local_objective(best_params)
+
+    print("Initial Powell parameters:", best_params)
+    print("Initial Powell objective:", initial_error)
+
+    if not np.isfinite(initial_error) or initial_error >= 1e29:
+        raise ValueError(
+            "The loaded starting point is already invalid. "
+            f"Initial objective = {initial_error}"
+        )
+
     local_result = minimize(
         local_objective,
         x0=best_params,
@@ -791,11 +802,37 @@ def run_powell_from_best(
         bounds=bounds,
         options={
             "maxiter": 1000,
+            "maxfev": 20000,
             "xtol": 1e-4,
             "ftol": 1e-4,
             "disp": True,
         },
     )
+
+    # Never replace a valid starting point with an invalid or worse result.
+    if (
+        not np.isfinite(local_result.fun)
+        or local_result.fun >= 1e29
+        or local_result.fun > initial_error
+    ):
+        print(
+            "Powell did not improve the DE result. "
+            "Keeping the original DE parameters."
+        )
+
+        from scipy.optimize import OptimizeResult
+
+        local_result = OptimizeResult(
+            x=best_params.copy(),
+            fun=float(initial_error),
+            success=False,
+            message=(
+                "Powell entered an invalid region or did not improve "
+                "the differential-evolution solution."
+            ),
+            nit=getattr(local_result, "nit", 0),
+            nfev=getattr(local_result, "nfev", 0),
+        )
 
     param_names = get_param_names()
 
@@ -804,6 +841,7 @@ def run_powell_from_best(
         "success": bool(local_result.success),
         "message": str(local_result.message),
         "error": float(local_result.fun),
+        "initial_error": float(initial_error),
         "iterations": int(getattr(local_result, "nit", -1)),
         "function_evaluations": int(getattr(local_result, "nfev", -1)),
         "valid_fit": bool(local_result.fun < 1e29),
@@ -821,15 +859,13 @@ def run_powell_from_best(
         },
     }
 
-    local_summary_path = os.path.join(out_dir, "powell_result_summary.json")
+    local_summary_path = os.path.join(
+        out_dir,
+        "powell_result_summary.json",
+    )
 
     with open(local_summary_path, "w", encoding="utf-8") as f:
         json.dump(local_summary, f, indent=2)
-
-    if local_result.fun >= 1e29:
-        print("⚠️ Local optimization failed.")
-        print(f"Powell summary saved to: {local_summary_path}")
-        return local_result, None
 
     fit_table = save_fit_results(
         result=local_result,
@@ -845,14 +881,319 @@ def run_powell_from_best(
 
     save_fit_plots(fit_table, out_dir=out_dir)
 
-    print("Local error:", local_result.fun)
-    print("Local parameters:", local_result.x)
-    print(f"Powell summary saved to: {local_summary_path}")
-    print(fit_table)
+    print("Final error:", local_result.fun)
+    print("Final parameters:", local_result.x)
 
     return local_result, fit_table
 
+def make_local_bounds(x0, global_bounds, relative_width=0.15):
+    local_bounds = []
 
+    for value, (global_low, global_high) in zip(x0, global_bounds):
+        global_range = global_high - global_low
+        half_width = relative_width * global_range
+
+        local_low = max(global_low, value - half_width)
+        local_high = min(global_high, value + half_width)
+
+        local_bounds.append((local_low, local_high))
+
+    return local_bounds
+
+def diagnose_params(
+    params,
+    empirical_data,
+    targets,
+    N_grid=81,
+    L=3.0,
+    dt=0.002,
+    threshold=0.2,
+):
+    (
+        lambda_,
+        delta,
+        k_n,
+        k_p,
+        k_d,
+        alpha,
+        beta,
+        mu,
+        R0,
+        time_scale,
+        pixel_scale,
+        intensity_scale,
+    ) = params
+
+    empirical_days = empirical_data["Day"].values
+
+    try:
+        sim_results = simulate_model(
+            params=[
+                lambda_,
+                delta,
+                k_n,
+                k_p,
+                k_d,
+                alpha,
+                beta,
+                mu,
+                R0,
+                time_scale,
+            ],
+            empirical_days=empirical_days,
+            N_grid=N_grid,
+            L=L,
+            dt=dt,
+        )
+    except Exception as exc:
+        print("Simulation exception:", repr(exc))
+        return
+
+    for _, row in empirical_data.iterrows():
+        day = row["Day"]
+
+        if day not in sim_results:
+            print(f"Day {day}: missing from simulation results")
+            continue
+
+        H = sim_results[day]["H"]
+        dx = sim_results[day]["dx"]
+
+        obs = calculate_model_observables(
+            H,
+            dx=dx,
+            pixel_scale=pixel_scale,
+            intensity_scale=intensity_scale,
+            threshold=threshold,
+        )
+
+        print(
+            f"Day {day:6g}: "
+            f"Hmin={np.min(H):.5g}, "
+            f"Hmax={np.max(H):.5g}, "
+            f"pixels_above_threshold={np.sum(H >= threshold)}, "
+            f"radius={obs['Radius']}, "
+            f"boundary={obs['TouchesBoundary']}"
+        )
+
+        for target in targets:
+            if target not in obs:
+                print(f"    Missing observable: {target}")
+            elif not np.isfinite(obs[target]):
+                print(f"    Non-finite observable: {target}")
+
+def run_local_from_best(
+    best_json_path,
+    empirical_data,
+    targets,
+    bounds,
+    out_dir="local_fit_mu",
+    N_grid=81,
+    L=3.0,
+    dt=0.002,
+    threshold=0.2,
+    relative_width=0.10,
+    input_type="de",
+):
+    os.makedirs(out_dir, exist_ok=True)
+
+    if input_type == "local":
+        best_params = load_local_params(best_json_path)
+    else:
+        best_params = load_best_params(best_json_path)
+
+    def local_objective(params):
+        return objective(
+            params,
+            empirical_data,
+            targets,
+            N_grid=N_grid,
+            L=L,
+            dt=dt,
+            threshold=threshold,
+        )
+
+    initial_error = local_objective(best_params)
+
+    print("Initial parameters:")
+    for name, value in zip(get_param_names(), best_params):
+        print(f"  {name:16s} = {value:.8g}")
+
+    print(f"Initial objective: {initial_error:.8g}")
+
+    if not np.isfinite(initial_error) or initial_error >= 1e29:
+        raise ValueError(
+            "The differential-evolution starting point is invalid: "
+            f"objective={initial_error}"
+        )
+
+    local_bounds = make_local_bounds(
+        best_params,
+        bounds,
+        relative_width=relative_width,
+    )
+
+    print("\nLocal bounds:")
+    for name, local_bound in zip(
+        get_param_names(),
+        local_bounds,
+    ):
+        print(f"  {name:16s}: {local_bound}")
+
+    evaluation_state = {
+    "nfev": 0,
+    "best": initial_error,
+}
+
+    def tracked_objective(params):
+        value = local_objective(params)
+        evaluation_state["nfev"] += 1
+    
+        if value < evaluation_state["best"]:
+            evaluation_state["best"] = value
+    
+            print(
+                f"Evaluation {evaluation_state['nfev']}: "
+                f"new best = {value:.6f}"
+            )
+    
+        return value
+    
+    
+    candidate_result = minimize(
+        tracked_objective,
+        x0=best_params,
+        method="Nelder-Mead",
+        bounds=local_bounds,
+        options={
+            "maxiter": 1200,
+            "maxfev": 3000,
+            "xatol": 1e-4,
+            "fatol": 1e-3,
+            "adaptive": True,
+            "disp": True,
+        },
+    )
+    
+    print("\nQUICK TEST RESULT")
+    print("Initial error:  ", initial_error)
+    print("Candidate error:", candidate_result.fun)
+    print("Evaluations:    ", candidate_result.nfev)
+    print("Iterations:     ", candidate_result.nit)
+    print("Message:        ", candidate_result.message)
+    
+    if np.isfinite(candidate_result.fun) and candidate_result.fun < initial_error:
+        print("METHOD IS WORKING: objective decreased.")
+    elif candidate_result.fun >= 1e29:
+        print("METHOD FAILED: optimizer entered the invalid region.")
+    else:
+        print(
+            "No improvement during the short test. "
+            "This does not necessarily mean the method is broken."
+        )
+
+    candidate_valid = (
+        np.isfinite(candidate_result.fun)
+        and candidate_result.fun < 1e29
+    )
+
+    candidate_improved = (
+        candidate_valid
+        and candidate_result.fun < initial_error
+    )
+
+    if candidate_improved:
+        print(
+            f"Local optimization improved the objective: "
+            f"{initial_error:.8g} -> "
+            f"{candidate_result.fun:.8g}"
+        )
+        final_result = candidate_result
+
+    else:
+        print(
+            "Local optimization did not improve the DE solution. "
+            "Keeping the original parameters."
+        )
+
+        from scipy.optimize import OptimizeResult
+
+        final_result = OptimizeResult(
+            x=best_params.copy(),
+            fun=float(initial_error),
+            success=False,
+            message=(
+                "Local optimization did not improve the "
+                "differential-evolution result."
+            ),
+            nit=int(getattr(candidate_result, "nit", 0)),
+            nfev=int(getattr(candidate_result, "nfev", 0)),
+        )
+
+    fit_table = save_fit_results(
+        result=final_result,
+        empirical_data=empirical_data,
+        targets=targets,
+        out_dir=out_dir,
+        N_grid=N_grid,
+        L=L,
+        dt=dt,
+        threshold=threshold,
+        optimizer_name="Nelder-Mead local refinement",
+    )
+
+    save_fit_plots(
+        fit_table,
+        out_dir=out_dir,
+    )
+
+    summary = {
+        "optimizer": "Nelder-Mead",
+        "initial_error": float(initial_error),
+        "candidate_error": float(candidate_result.fun),
+        "final_error": float(final_result.fun),
+        "candidate_success": bool(candidate_result.success),
+        "candidate_message": str(candidate_result.message),
+        "candidate_improved": bool(candidate_improved),
+        "relative_bound_width": float(relative_width),
+        "iterations": int(
+            getattr(candidate_result, "nit", -1)
+        ),
+        "function_evaluations": int(
+            getattr(candidate_result, "nfev", -1)
+        ),
+        "parameters": {
+            name: float(value)
+            for name, value in zip(
+                get_param_names(),
+                final_result.x,
+            )
+        },
+    }
+
+    with open(
+        os.path.join(
+            out_dir,
+            "local_result_summary.json",
+        ),
+        "w",
+        encoding="utf-8",
+    ) as file:
+        json.dump(summary, file, indent=2)
+
+    return final_result, fit_table
+
+def load_local_params(path):
+    with open(path, "r", encoding="utf-8") as file:
+        data = json.load(file)
+
+    return np.array(
+        [
+            float(data["parameters"][name])
+            for name in get_param_names()
+        ],
+        dtype=float,
+    )
 # ============================================================
 # Configuration
 # ============================================================
@@ -899,8 +1240,8 @@ bounds = [
 # ============================================================
 
 if __name__ == "__main__":
-    empirical_data = load_empirical_data("500.txt")
-
+    empirical_data = load_empirical_data("3375.txt")
+    '''
     seeds = [1,2,3,4,5]
 
     seed_summary = run_seed_series(
@@ -908,9 +1249,9 @@ if __name__ == "__main__":
         empirical_data=empirical_data,
         targets=targets,
         bounds=bounds,
-        out_dir="seed_runs_mu_500",
-        maxiter=150,
-        popsize=20,
+        out_dir="seed_runs_mu_3375",
+        maxiter=8,
+        popsize=5,
         N_grid=N_GRID,
         L=L,
         dt=DT,
@@ -918,15 +1259,21 @@ if __name__ == "__main__":
     )
 
     print(seed_summary)
-
+    '''
     # Optional local polishing from the best seed:
-    local_result, local_fit_table = run_powell_from_best(
-         best_json_path="seed_runs_mu_500/best_seed_summary.json",
-         empirical_data=empirical_data,
-         targets=targets,
-         bounds=bounds,
-         out_dir="local_fit_mu_500",
-         N_grid=N_GRID,
-         L=L,
-         dt=DT,
-         threshold=H_THRESHOLD,)
+    local_result, local_fit_table = run_local_from_best(
+    best_json_path=(
+        "seed_runs_mu_3375/"
+        "best_seed_summary.json"
+    ),
+    empirical_data=empirical_data,
+    targets=targets,
+    bounds=bounds,
+    out_dir="local_fit_mu_3375_final",
+    N_grid=N_GRID,
+    L=L,
+    dt=DT,
+    threshold=H_THRESHOLD,
+    relative_width=0.10,
+    input_type="de",
+)
