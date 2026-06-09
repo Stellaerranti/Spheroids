@@ -899,7 +899,7 @@ bounds = [
 # ============================================================
 
 if __name__ == "__main__":
-    empirical_data = load_empirical_data("15625.txt")
+    empirical_data = load_empirical_data("500.txt")
 
     seeds = [1,2,3,4,5]
 
@@ -908,7 +908,7 @@ if __name__ == "__main__":
         empirical_data=empirical_data,
         targets=targets,
         bounds=bounds,
-        out_dir="seed_runs_mu_15625",
+        out_dir="seed_runs_mu_500",
         maxiter=150,
         popsize=20,
         N_grid=N_GRID,
@@ -921,11 +921,11 @@ if __name__ == "__main__":
 
     # Optional local polishing from the best seed:
     local_result, local_fit_table = run_powell_from_best(
-         best_json_path="seed_runs_mu_15625/best_seed_summary.json",
+         best_json_path="seed_runs_mu_500/best_seed_summary.json",
          empirical_data=empirical_data,
          targets=targets,
          bounds=bounds,
-         out_dir="local_fit_mu_15625",
+         out_dir="local_fit_mu_500",
          N_grid=N_GRID,
          L=L,
          dt=DT,
