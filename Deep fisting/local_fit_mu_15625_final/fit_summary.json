@@ -22,26 +22,26 @@
     "Perimeter": 0.25
   },
   "fitted_parameters": {
-    "lambda_": 5.820608485334177,
-    "delta": 0.0012617652713545688,
-    "k_n": 0.6254155385458615,
-    "k_p": 0.40882869211472117,
-    "k_d": 0.359633937922202,
-    "alpha": 7.839808161271517,
-    "beta": 0.8573217678813476,
-    "mu": 1.5273035402071473,
-    "R0": 0.37805148632715213,
-    "time_scale": 0.26047817964040254,
-    "pixel_scale": 620.9394630469451,
-    "intensity_scale": 210.05546276929303
+    "lambda_": 4.259744094698309,
+    "delta": 0.01732737799803004,
+    "k_n": 0.7510369120162026,
+    "k_p": 0.3393371468975169,
+    "k_d": 0.35570891776221575,
+    "alpha": 5.09460252032973,
+    "beta": 2.122311178859501,
+    "mu": 0.0562473675308178,
+    "R0": 0.4426647610445666,
+    "time_scale": 0.24517353951032364,
+    "pixel_scale": 624.2528985329479,
+    "intensity_scale": 211.8334610222309
   },
   "optimizer": {
-    "method": "differential_evolution",
+    "method": "Nelder-Mead local refinement",
     "success": false,
-    "message": "Maximum number of iterations has been exceeded.",
-    "error": 177.41107252005517,
-    "iterations": 8,
-    "function_evaluations": 813
+    "message": "Maximum number of function evaluations has been exceeded.",
+    "error": 141.117158802576,
+    "iterations": 993,
+    "function_evaluations": 3000
   },
   "simulation": {
     "N_grid": 81,

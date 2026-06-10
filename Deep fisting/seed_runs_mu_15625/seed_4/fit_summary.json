@@ -22,26 +22,26 @@
     "Perimeter": 0.25
   },
   "fitted_parameters": {
-    "lambda_": 5.820608485334177,
-    "delta": 0.0012617652713545688,
-    "k_n": 0.6254155385458615,
-    "k_p": 0.40882869211472117,
-    "k_d": 0.359633937922202,
-    "alpha": 7.839808161271517,
-    "beta": 0.8573217678813476,
-    "mu": 1.5273035402071473,
-    "R0": 0.37805148632715213,
-    "time_scale": 0.26047817964040254,
-    "pixel_scale": 620.9394630469451,
-    "intensity_scale": 210.05546276929303
+    "lambda_": 4.219382412930789,
+    "delta": 0.017177735697697642,
+    "k_n": 0.7459549612136596,
+    "k_p": 0.34811344333033833,
+    "k_d": 0.3512499528516875,
+    "alpha": 5.026209048945109,
+    "beta": 2.1295826586039697,
+    "mu": 0.05569251652951013,
+    "R0": 0.4428077325202261,
+    "time_scale": 0.24288258358686654,
+    "pixel_scale": 624.6691838755559,
+    "intensity_scale": 211.85071960746103
   },
   "optimizer": {
     "method": "differential_evolution",
     "success": false,
     "message": "Maximum number of iterations has been exceeded.",
-    "error": 177.41107252005517,
+    "error": 158.09453740930908,
     "iterations": 8,
-    "function_evaluations": 813
+    "function_evaluations": 579
   },
   "simulation": {
     "N_grid": 81,
