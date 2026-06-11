@@ -1125,9 +1125,11 @@ target_weights = {
 
 data_1000 = load_empirical_data("1000.txt")
 data_2000 = load_empirical_data("2000.txt")
+data_3375 = load_empirical_data("3375.txt")
 
 params_1000 = load_fitted_params("local_fit_mu_1000_final/local_result_summary.json")
 params_2000 = load_fitted_params("local_fit_mu_2000_final/local_result_summary.json")
+params_3375 = load_fitted_params("local_fit_mu_3375_final/local_result_summary.json")
 
 #err = compare_two_parameter_sets(params_1000,params_2000,data_1000,data_2000,targets)
 
@@ -1140,38 +1142,33 @@ p2000 = np.array(params_2000, dtype=float)
 # lambda_, delta, k_n, k_p, k_d, alpha, beta, mu,
 # R0, time_scale, pixel_scale, intensity_scale
 
-datasets_1000_2000 = {
+# ============================================================
+# Joint 1000 + 2000 + 8000
+# ============================================================
+
+data_8000 = load_empirical_data("8000.txt")
+params_8000 = load_fitted_params("local_fit_mu_8000_final/local_result_summary.json")
+
+datasets_1000_2000_8000 = {
     "1000": data_1000,
     "2000": data_2000,
+    "8000": data_8000,
 }
 
-param_dict_1000_2000 = {
+param_dict_1000_2000_8000 = {
     "1000": params_1000,
     "2000": params_2000,
-}
-data_3375 = load_empirical_data("3375.txt")
-params_3375 = load_fitted_params("local_fit_mu_3375_final/local_result_summary.json")
-
-datasets_1000_2000_3375 = {
-    "1000": data_1000,
-    "2000": data_2000,
-    "3375": data_3375,
+    "8000": params_8000,
 }
 
-param_dict_1000_2000_3375 = {
-    "1000": params_1000,
-    "2000": params_2000,
-    "3375": params_3375,
-}
-
-x0_joint_3_time = build_joint_initial_guess_dataset_time(
-    param_dict_1000_2000_3375
+x0_joint_1000_2000_8000 = build_joint_initial_guess(
+    param_dict_1000_2000_8000
 )
 
-result_joint_3_time = minimize(
-    joint_objective_dataset_time,
-    x0=x0_joint_3_time,
-    args=(datasets_1000_2000_3375, targets),
+result_joint_1000_2000_8000 = minimize(
+    joint_objective_shared_biology,
+    x0=x0_joint_1000_2000_8000,
+    args=(datasets_1000_2000_8000, targets),
     method="Nelder-Mead",
     options={
         "maxiter": 2500,
@@ -1183,32 +1180,193 @@ result_joint_3_time = minimize(
     },
 )
 
-print("\n=== Joint 1000 + 2000 + 3375: dataset-specific time_scale ===")
-print("Success:", result_joint_3_time.success)
-print("Message:", result_joint_3_time.message)
-print("Iterations:", result_joint_3_time.nit)
-print("Function evaluations:", result_joint_3_time.nfev)
-print("Joint error:", result_joint_3_time.fun)
+print("\n=== Joint 1000 + 2000 + 8000 ===")
+print("Success:", result_joint_1000_2000_8000.success)
+print("Message:", result_joint_1000_2000_8000.message)
+print("Iterations:", result_joint_1000_2000_8000.nit)
+print("Function evaluations:", result_joint_1000_2000_8000.nfev)
+print("Joint error:", result_joint_1000_2000_8000.fun)
 print("Joint parameters:")
-print(result_joint_3_time.x)
+print(result_joint_1000_2000_8000.x)
+
+independent_1000_2000_8000 = independent_error_sum(
+    param_dict_1000_2000_8000,
+    datasets_1000_2000_8000,
+    targets,
+)
+
+shared_1000_2000_8000 = split_joint_errors(
+    result_joint_1000_2000_8000.x,
+    datasets_1000_2000_8000,
+    targets,
+)
 
 print("\nIndependent baseline:")
-independent_3 = independent_error_sum(
-    param_dict_1000_2000_3375,
-    datasets_1000_2000_3375,
+print(independent_1000_2000_8000)
+
+print("\nShared biological fit:")
+print(shared_1000_2000_8000)
+
+E_independent_1000_2000_8000 = independent_1000_2000_8000[
+    "independent_error"
+].iloc[-1]
+
+E_joint_1000_2000_8000 = result_joint_1000_2000_8000.fun
+
+print(
+    "\nJoint / independent ratio:",
+    E_joint_1000_2000_8000 / E_independent_1000_2000_8000
+)
+
+# ============================================================
+# Joint 1000 + 2000 + 15625
+# ============================================================
+
+data_15625 = load_empirical_data("15625.txt")
+params_15625 = load_fitted_params("local_fit_mu_15625_final/local_result_summary.json")
+
+datasets_1000_2000_15625 = {
+    "1000": data_1000,
+    "2000": data_2000,
+    "15625": data_15625,
+}
+
+param_dict_1000_2000_15625 = {
+    "1000": params_1000,
+    "2000": params_2000,
+    "15625": params_15625,
+}
+
+x0_joint_1000_2000_15625 = build_joint_initial_guess(
+    param_dict_1000_2000_15625
+)
+
+result_joint_1000_2000_15625 = minimize(
+    joint_objective_shared_biology,
+    x0=x0_joint_1000_2000_15625,
+    args=(datasets_1000_2000_15625, targets),
+    method="Nelder-Mead",
+    options={
+        "maxiter": 2500,
+        "maxfev": 3000,
+        "xatol": 1e-5,
+        "fatol": 1e-4,
+        "adaptive": True,
+        "disp": True,
+    },
+)
+
+print("\n=== Joint 1000 + 2000 + 15625 ===")
+print("Success:", result_joint_1000_2000_15625.success)
+print("Message:", result_joint_1000_2000_15625.message)
+print("Iterations:", result_joint_1000_2000_15625.nit)
+print("Function evaluations:", result_joint_1000_2000_15625.nfev)
+print("Joint error:", result_joint_1000_2000_15625.fun)
+print("Joint parameters:")
+print(result_joint_1000_2000_15625.x)
+
+independent_1000_2000_15625 = independent_error_sum(
+    param_dict_1000_2000_15625,
+    datasets_1000_2000_15625,
     targets,
 )
-print(independent_3)
 
-print("\nShared biology, dataset-specific time_scale:")
-shared_3_time = split_joint_errors_dataset_time(
-    result_joint_3_time.x,
-    datasets_1000_2000_3375,
+shared_1000_2000_15625 = split_joint_errors(
+    result_joint_1000_2000_15625.x,
+    datasets_1000_2000_15625,
     targets,
 )
-print(shared_3_time)
 
-E_independent_3 = independent_3["independent_error"].iloc[-1]
-E_joint_3_time = result_joint_3_time.fun
+print("\nIndependent baseline:")
+print(independent_1000_2000_15625)
 
-print("\nJoint / independent ratio:", E_joint_3_time / E_independent_3)
+print("\nShared biological fit:")
+print(shared_1000_2000_15625)
+
+E_independent_1000_2000_15625 = independent_1000_2000_15625[
+    "independent_error"
+].iloc[-1]
+
+E_joint_1000_2000_15625 = result_joint_1000_2000_15625.fun
+
+print(
+    "\nJoint / independent ratio:",
+    E_joint_1000_2000_15625 / E_independent_1000_2000_15625
+)
+
+# ============================================================
+# Joint 1000 + 2000 + 3375 + 8000 + 15625
+# ============================================================
+
+datasets_all_large_test = {
+    "1000": data_1000,
+    "2000": data_2000,
+    "3375": data_3375,
+    "8000": data_8000,
+    "15625": data_15625,
+}
+
+param_dict_all_large_test = {
+    "1000": params_1000,
+    "2000": params_2000,
+    "3375": params_3375,
+    "8000": params_8000,
+    "15625": params_15625,
+}
+
+x0_joint_all_large_test = build_joint_initial_guess(
+    param_dict_all_large_test
+)
+
+result_joint_all_large_test = minimize(
+    joint_objective_shared_biology,
+    x0=x0_joint_all_large_test,
+    args=(datasets_all_large_test, targets),
+    method="Nelder-Mead",
+    options={
+        "maxiter": 3500,
+        "maxfev": 5000,
+        "xatol": 1e-5,
+        "fatol": 1e-4,
+        "adaptive": True,
+        "disp": True,
+    },
+)
+
+print("\n=== Joint 1000 + 2000 + 3375 + 8000 + 15625 ===")
+print("Success:", result_joint_all_large_test.success)
+print("Message:", result_joint_all_large_test.message)
+print("Iterations:", result_joint_all_large_test.nit)
+print("Function evaluations:", result_joint_all_large_test.nfev)
+print("Joint error:", result_joint_all_large_test.fun)
+print("Joint parameters:")
+print(result_joint_all_large_test.x)
+
+independent_all_large_test = independent_error_sum(
+    param_dict_all_large_test,
+    datasets_all_large_test,
+    targets,
+)
+
+shared_all_large_test = split_joint_errors(
+    result_joint_all_large_test.x,
+    datasets_all_large_test,
+    targets,
+)
+
+print("\nIndependent baseline:")
+print(independent_all_large_test)
+
+print("\nShared biological fit:")
+print(shared_all_large_test)
+
+E_independent_all_large_test = independent_all_large_test[
+    "independent_error"
+].iloc[-1]
+
+E_joint_all_large_test = result_joint_all_large_test.fun
+
+print(
+    "\nJoint / independent ratio:",
+    E_joint_all_large_test / E_independent_all_large_test
+)
