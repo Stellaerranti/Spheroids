@@ -1,0 +1,26 @@
+{
+  "optimizer": "Nelder-Mead",
+  "initial_error": 102.71522846223495,
+  "candidate_error": 100.4966169538418,
+  "final_error": 100.4966169538418,
+  "candidate_success": false,
+  "candidate_message": "Maximum number of function evaluations has been exceeded.",
+  "candidate_improved": true,
+  "relative_bound_width": 0.1,
+  "iterations": 977,
+  "function_evaluations": 3000,
+  "parameters": {
+    "lambda_": 9.91295054529068,
+    "delta": 0.0008535735901124726,
+    "k_n": 0.5868543337439176,
+    "k_p": 0.5282528333759289,
+    "k_d": 0.271272682860701,
+    "alpha": 7.82841988244115,
+    "beta": 1.5981752396573679,
+    "mu": 0.8183038443293097,
+    "R0": 0.44984127211762726,
+    "time_scale": 0.15235154901617673,
+    "pixel_scale": 620.8350962828417,
+    "intensity_scale": 201.0014678999213
+  }
+}
