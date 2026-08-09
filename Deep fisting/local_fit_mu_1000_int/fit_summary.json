@@ -1,0 +1,61 @@
+{
+  "equations": [
+    "n_t = laplacian(n) - lambda_ * n / (k_n + n) * h",
+    "h_t = delta * laplacian(h) + alpha * n / (k_p + n) * h * (1 - h) - beta * k_d / (k_d + n) * h - mu * h"
+  ],
+  "boundary_conditions": {
+    "n": "Dirichlet n = 1",
+    "h": "Neumann zero-flux"
+  },
+  "targets": [
+    "Radius",
+    "GrayMean",
+    "IntDen",
+    "Feret",
+    "Perimeter"
+  ],
+  "target_weights": {
+    "Radius": 1.0,
+    "GrayMean": 1.0,
+    "IntDen": 1.0,
+    "Feret": 0.25,
+    "Perimeter": 0.25
+  },
+  "fitted_parameters": {
+    "lambda_": 9.942685115053742,
+    "delta": 1.0514431498893014e-05,
+    "k_n": 0.3001343188112334,
+    "k_p": 0.6829569952195089,
+    "k_d": 0.3563228536800285,
+    "alpha": 6.3676446463261485,
+    "beta": 3.6329510731389085,
+    "mu": 0.08139455575382427,
+    "R0": 0.41374688439060286,
+    "time_scale": 0.06679447067509035,
+    "pixel_scale": 583.374638200364,
+    "intensity_scale": 229.07295447615394
+  },
+  "optimizer": {
+    "method": "Nelder-Mead local refinement",
+    "success": false,
+    "message": "Maximum number of iterations has been exceeded.",
+    "error": 30.325753070808748,
+    "iterations": 1200,
+    "function_evaluations": 2388
+  },
+  "simulation": {
+    "N_grid": 81,
+    "L": 3.0,
+    "dt": 0.001,
+    "threshold": 0.2
+  },
+  "model_extension": {
+    "baseline_turnover_enabled": true,
+    "mu_interpretation": "mu is inverse effective cell life expectancy in model time units",
+    "late_saturation_penalty_enabled": false
+  },
+  "output_files": {
+    "fit_table": "fit_table.csv",
+    "fit_summary": "fit_summary.json"
+  }
+}
