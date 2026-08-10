@@ -1,0 +1,61 @@
+{
+  "equations": [
+    "n_t = laplacian(n) - lambda_ * n / (k_n + n) * h",
+    "h_t = delta * laplacian(h) + alpha * n / (k_p + n) * h * (1 - h) - beta * k_d / (k_d + n) * h - mu * h"
+  ],
+  "boundary_conditions": {
+    "n": "Dirichlet n = 1",
+    "h": "Neumann zero-flux"
+  },
+  "targets": [
+    "Radius",
+    "GrayMean",
+    "IntDen",
+    "Feret",
+    "Perimeter"
+  ],
+  "target_weights": {
+    "Radius": 1.0,
+    "GrayMean": 1.0,
+    "IntDen": 1.0,
+    "Feret": 0.25,
+    "Perimeter": 0.25
+  },
+  "fitted_parameters": {
+    "lambda_": 7.626974962714382,
+    "delta": 0.00266338248654276,
+    "k_n": 0.3538802073382117,
+    "k_p": 0.5256958764981903,
+    "k_d": 0.13970146839774772,
+    "alpha": 5.839615987742962,
+    "beta": 3.087056797194413,
+    "mu": 0.5007120783700919,
+    "R0": 0.3338531828434049,
+    "time_scale": 0.15488354254488276,
+    "pixel_scale": 510.4301925275664,
+    "intensity_scale": 215.42850854010084
+  },
+  "optimizer": {
+    "method": "differential_evolution",
+    "success": false,
+    "message": "Maximum number of iterations has been exceeded.",
+    "error": 56.66939141265088,
+    "iterations": 8,
+    "function_evaluations": 995
+  },
+  "simulation": {
+    "N_grid": 81,
+    "L": 3.0,
+    "dt": 0.001,
+    "threshold": 0.2
+  },
+  "model_extension": {
+    "baseline_turnover_enabled": true,
+    "mu_interpretation": "mu is inverse effective cell life expectancy in model time units",
+    "late_saturation_penalty_enabled": false
+  },
+  "output_files": {
+    "fit_table": "fit_table.csv",
+    "fit_summary": "fit_summary.json"
+  }
+}
