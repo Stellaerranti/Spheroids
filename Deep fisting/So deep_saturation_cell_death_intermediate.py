@@ -1539,7 +1539,7 @@ bounds = [
 # ============================================================
 
 if __name__ == "__main__":
-    empirical_data = load_empirical_data("8000.txt")
+    empirical_data = load_empirical_data("15625.txt")
    
     seeds = [1,2,3,4,5]
 
@@ -1548,7 +1548,7 @@ if __name__ == "__main__":
         empirical_data=empirical_data,
         targets=targets,
         bounds=bounds,
-        out_dir="seed_runs_mu_8000_int",
+        out_dir="seed_runs_mu_15625_int",
         maxiter=8,
         popsize=5,
         N_grid=N_GRID,
@@ -1562,13 +1562,13 @@ if __name__ == "__main__":
     # Optional local polishing from the best seed:
     local_result, local_fit_table = run_local_from_best(
     best_json_path=(
-        "seed_runs_mu_8000_int/"
+        "seed_runs_mu_15625_int/"
         "best_seed_summary.json"
     ),
     empirical_data=empirical_data,
     targets=targets,
     bounds=bounds,
-    out_dir="local_fit_mu_8000_int",
+    out_dir="local_fit_mu_15625_int",
     N_grid=N_GRID,
     L=L,
     dt=DT,
@@ -1582,7 +1582,7 @@ if __name__ == "__main__":
     dense_fit_table = save_dense_simulation(
         params=local_result.x,
         empirical_data=empirical_data,
-        out_dir="local_fit_mu_8000_int/dense_simulation",
+        out_dir="local_fit_mu_15625_int/dense_simulation",
         output_interval=0.1,  # change to 0.05, 0.25, 0.5, etc. if desired
         start_day=0.0,
         N_grid=N_GRID,
